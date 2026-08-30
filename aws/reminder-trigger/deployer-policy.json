@@ -1,0 +1,57 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageStudyFlowLambdaFunction",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:GetFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:InvokeFunction"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:084828606768:function:studyflow-reminder-trigger"
+    },
+    {
+      "Sid": "ManageStudyFlowIamRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:GetRole",
+        "iam:PutRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:ListAttachedRolePolicies"
+      ],
+      "Resource": [
+        "arn:aws:iam::084828606768:role/studyflow-reminder-lambda-role",
+        "arn:aws:iam::084828606768:role/studyflow-reminder-scheduler-role"
+      ]
+    },
+    {
+      "Sid": "PassStudyFlowRolesToLambdaAndScheduler",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::084828606768:role/studyflow-reminder-lambda-role",
+        "arn:aws:iam::084828606768:role/studyflow-reminder-scheduler-role"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": ["lambda.amazonaws.com", "scheduler.amazonaws.com"]
+        }
+      }
+    },
+    {
+      "Sid": "ManageStudyFlowSchedule",
+      "Effect": "Allow",
+      "Action": [
+        "scheduler:CreateSchedule",
+        "scheduler:GetSchedule",
+        "scheduler:UpdateSchedule"
+      ],
+      "Resource": "arn:aws:scheduler:us-east-1:084828606768:schedule/default/studyflow-reminder-schedule"
+    }
+  ]
+}
