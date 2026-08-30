@@ -1,18 +1,30 @@
 import { useRef, useState } from 'react'
-import { AlertCircle, Database, Download, Sparkles, Trash2, Upload } from 'lucide-react'
+import { AlertCircle, Database, Download, LogOut, Mail, Sparkles, Trash2, Upload, User as UserIcon } from 'lucide-react'
 import { useStudy } from '../hooks/useStudy'
+import { useAuth } from '../hooks/useAuth'
 import { GoalForm } from '../components/settings/GoalForm'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
-import { importStudyData } from '../services/storage'
+import { readJsonFile } from '../services/storage'
+import type { DayOverride, StudyGoal, StudyItem, StudySession } from '../types'
+
+interface BackupFile {
+  goal: StudyGoal | null
+  items: StudyItem[]
+  sessions: StudySession[]
+  dayOverrides: Record<string, DayOverride>
+}
 
 export default function Settings() {
   const { state, setGoal, exportData, importData, resetData, loadDemoData } = useStudy()
+  const { user, logout } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
   const [confirmDemo, setConfirmDemo] = useState(false)
+  const [confirmLogout, setConfirmLogout] = useState(false)
 
   const handleImportClick = () => fileInputRef.current?.click()
 
@@ -20,17 +32,45 @@ export default function Settings() {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
+    setImportBusy(true)
     try {
-      const data = await importStudyData(file)
-      importData(data)
+      const data = await readJsonFile<BackupFile>(file)
+      if (!data || !Array.isArray(data.items) || !Array.isArray(data.sessions)) {
+        throw new Error('That file does not look like a valid StudyFlow backup.')
+      }
+      await importData({
+        goal: data.goal ?? null,
+        items: data.items,
+        sessions: data.sessions,
+        dayOverrides: data.dayOverrides ?? {},
+      })
       setImportError(null)
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Failed to import file.')
+    } finally {
+      setImportBusy(false)
     }
   }
 
   return (
     <div className="space-y-5">
+      <Card>
+        <CardHeader title="Account" subtitle="Signed in — your data syncs across every device you log into" />
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+            <UserIcon size={15} className="text-slate-400" /> {user?.name}
+          </div>
+          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+            <Mail size={15} className="text-slate-400" /> {user?.email}
+          </div>
+        </div>
+        <div className="mt-4">
+          <Button variant="secondary" icon={<LogOut size={16} />} onClick={() => setConfirmLogout(true)}>
+            Log out
+          </Button>
+        </div>
+      </Card>
+
       <GoalForm goal={state.goal} onSave={setGoal} />
 
       <Card>
@@ -45,16 +85,17 @@ export default function Settings() {
       </Card>
 
       <Card>
-        <CardHeader title="Backup & restore" subtitle="StudyFlow stores everything locally in your browser" />
+        <CardHeader title="Backup & restore" subtitle="Your data lives in the cloud — these are just manual backup copies" />
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" icon={<Download size={16} />} onClick={exportData}>
             Export data
           </Button>
-          <Button variant="secondary" icon={<Upload size={16} />} onClick={handleImportClick}>
-            Import data
+          <Button variant="secondary" icon={<Upload size={16} />} onClick={handleImportClick} disabled={importBusy}>
+            {importBusy ? 'Importing…' : 'Import data'}
           </Button>
           <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleFileChange} />
         </div>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Importing replaces your current goal, content and schedule.</p>
         {importError && (
           <p className="mt-3 flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
             <AlertCircle size={14} /> {importError}
@@ -66,7 +107,7 @@ export default function Settings() {
         <CardHeader title="Danger zone" subtitle="This cannot be undone" />
         <div className="flex items-center gap-3 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">
           <Database size={16} />
-          Reset all data — deletes your goal, content, sessions and history from this device.
+          Reset all data — deletes your goal, content, sessions and history from your account.
         </div>
         <div className="mt-3">
           <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => setConfirmReset(true)}>
@@ -78,7 +119,7 @@ export default function Settings() {
       <ConfirmDialog
         open={confirmReset}
         title="Reset all data?"
-        message="This will permanently delete your goal, study content, plan and history from this browser. This cannot be undone."
+        message="This will permanently delete your goal, study content, plan and history from your account. This cannot be undone."
         confirmLabel="Reset everything"
         danger
         onConfirm={() => {
@@ -98,6 +139,18 @@ export default function Settings() {
           setConfirmDemo(false)
         }}
         onCancel={() => setConfirmDemo(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmLogout}
+        title="Log out?"
+        message="You'll need to log back in to see your study data again on this device."
+        confirmLabel="Log out"
+        onConfirm={() => {
+          logout()
+          setConfirmLogout(false)
+        }}
+        onCancel={() => setConfirmLogout(false)}
       />
     </div>
   )
