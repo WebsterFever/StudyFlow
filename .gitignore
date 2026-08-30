@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Lambda build/test artifacts (regenerated locally, not source)
+aws/reminder-trigger/function.zip
+aws/reminder-trigger/out.json
