@@ -4,6 +4,8 @@ import type {
   ActiveTimer,
   AppState,
   DayOverride,
+  GoalInput,
+  GoalStatus,
   MasteryRating,
   SessionStatus,
   StudyGoal,
@@ -11,214 +13,63 @@ import type {
   StudySession,
 } from '../types'
 import { buildDemoGoal, buildDemoItems } from '../data/demoData'
-import { createEmptyState, downloadJson, loadActiveTimer, saveActiveTimer } from '../services/storage'
+import {
+  createEmptyState,
+  downloadJson,
+  loadActiveGoalId,
+  loadActiveTimer,
+  saveActiveGoalId,
+  saveActiveTimer,
+} from '../services/storage'
 import * as goalsApi from '../services/goalsApi'
 import * as studyItemsApi from '../services/studyItemsApi'
 import * as studySessionsApi from '../services/studySessionsApi'
 import * as dayOverridesApi from '../services/dayOverridesApi'
 import * as dataApi from '../services/dataApi'
+import type { MultiGoalPayload } from '../services/dataApi'
 import { maxISO, todayISO } from '../utils/date'
+import { generateId } from '../utils/id'
 import { regeneratePlan } from '../utils/planGenerator'
-
-type Action =
-  | { type: 'SET_GOAL'; goal: StudyGoal }
-  | { type: 'ADD_ITEM'; item: StudyItem }
-  | { type: 'ADD_ITEMS'; items: StudyItem[] }
-  | { type: 'UPDATE_ITEM'; item: StudyItem }
-  | { type: 'DELETE_ITEM'; id: string }
-  | { type: 'TOGGLE_ITEM_COMPLETE'; id: string; completed: boolean }
-  | { type: 'SET_ITEM_MASTERY'; id: string; mastery: MasteryRating }
-  | { type: 'MOVE_SESSION'; id: string; date: string }
-  | { type: 'REORDER_DAY'; date: string; orderedIds: string[] }
-  | { type: 'UPDATE_SESSION_DURATION'; id: string; minutes: number }
-  | { type: 'SET_DAY_OVERRIDE'; override: DayOverride }
-  | { type: 'CLEAR_DAY_OVERRIDE'; date: string }
-  | { type: 'REGENERATE_PLAN' }
-  | { type: 'START_SESSION'; sessionId: string }
-  | { type: 'STOP_TIMER' }
-  | { type: 'COMPLETE_SESSION'; sessionId: string; actualMinutes: number }
-  | { type: 'LOAD_DEMO_DATA' }
-  | { type: 'RESET_DATA' }
 
 function computeFromDate(goal: StudyGoal): string {
   return maxISO(goal.startDate, todayISO())
 }
 
-function withRegeneratedPlan(state: AppState): AppState {
-  if (!state.goal) return state
-  const { sessions } = regeneratePlan(state.items, state.goal, state.dayOverrides, state.sessions, computeFromDate(state.goal))
-  return { ...state, sessions }
-}
-
-function markItemCompletionFromSessions(state: AppState, itemId: string): StudyItem[] {
-  const stillIncomplete = state.sessions.some((s) => s.itemId === itemId && s.status !== 'completed')
-  if (stillIncomplete) return state.items
-  const now = new Date().toISOString()
-  return state.items.map((i) => (i.id === itemId ? { ...i, completed: true, completedDate: now } : i))
+function dayOverridesMapForGoal(dayOverrides: DayOverride[], goalId: string): Record<string, DayOverride> {
+  const map: Record<string, DayOverride> = {}
+  for (const o of dayOverrides) {
+    if (o.goalId === goalId) map[o.date] = o
+  }
+  return map
 }
 
 /**
- * Pure, synchronous local-state transitions — identical in spirit to the
- * original localStorage-only reducer. The backend never recomputes the plan;
- * it only persists whatever this function produces (see the *Api calls in
- * the wrapper functions below).
+ * Regenerates ONLY `goalId`'s sessions and splices the result back into the
+ * full cross-goal sessions array — every other goal's schedule is untouched.
+ * The backend never recomputes a plan; it only persists what this produces.
  */
-function reducer(state: AppState, action: Action): AppState {
-  switch (action.type) {
-    case 'SET_GOAL':
-      return withRegeneratedPlan({ ...state, goal: action.goal })
+function regenerateSessionsForGoal(state: AppState, goalId: string): StudySession[] {
+  const goal = state.goals.find((g) => g.id === goalId)
+  if (!goal) return state.sessions
+  const goalItems = state.items.filter((i) => i.goalId === goalId)
+  const goalSessions = state.sessions.filter((s) => s.goalId === goalId)
+  const overridesMap = dayOverridesMapForGoal(state.dayOverrides, goalId)
+  const { sessions: regenerated } = regeneratePlan(goalItems, goal, overridesMap, goalSessions, computeFromDate(goal))
+  const otherSessions = state.sessions.filter((s) => s.goalId !== goalId)
+  return [...otherSessions, ...regenerated]
+}
 
-    case 'ADD_ITEM':
-      return withRegeneratedPlan({ ...state, items: [...state.items, action.item] })
+function markItemCompletionFromSessions(sessions: StudySession[], items: StudyItem[], itemId: string): StudyItem[] {
+  const stillIncomplete = sessions.some((s) => s.itemId === itemId && s.status !== 'completed')
+  if (stillIncomplete) return items
+  const now = new Date().toISOString()
+  return items.map((i) => (i.id === itemId ? { ...i, completed: true, completedDate: now } : i))
+}
 
-    case 'ADD_ITEMS':
-      return withRegeneratedPlan({ ...state, items: [...state.items, ...action.items] })
-
-    case 'UPDATE_ITEM':
-      return withRegeneratedPlan({
-        ...state,
-        items: state.items.map((i) => (i.id === action.item.id ? action.item : i)),
-      })
-
-    case 'DELETE_ITEM':
-      return withRegeneratedPlan({
-        ...state,
-        items: state.items.filter((i) => i.id !== action.id),
-        sessions: state.sessions.filter((s) => s.itemId !== action.id),
-      })
-
-    case 'TOGGLE_ITEM_COMPLETE': {
-      const now = new Date().toISOString()
-      const items = state.items.map((i) =>
-        i.id === action.id ? { ...i, completed: action.completed, completedDate: action.completed ? now : null } : i,
-      )
-      const sessions = state.sessions.map((s) =>
-        s.itemId === action.id
-          ? action.completed
-            ? { ...s, status: 'completed' as SessionStatus, actualMinutes: s.actualMinutes ?? s.plannedMinutes, completedAt: now }
-            : { ...s, status: 'planned' as SessionStatus, actualMinutes: null, completedAt: null }
-          : s,
-      )
-      return withRegeneratedPlan({ ...state, items, sessions })
-    }
-
-    case 'SET_ITEM_MASTERY':
-      return { ...state, items: state.items.map((i) => (i.id === action.id ? { ...i, mastery: action.mastery } : i)) }
-
-    case 'MOVE_SESSION': {
-      const target = state.sessions.filter((s) => s.date === action.date)
-      const nextOrder = target.length === 0 ? 0 : Math.max(...target.map((s) => s.order)) + 1
-      return {
-        ...state,
-        sessions: state.sessions.map((s) =>
-          s.id === action.id ? { ...s, date: action.date, order: nextOrder, manuallyAdjusted: true } : s,
-        ),
-      }
-    }
-
-    case 'REORDER_DAY': {
-      const orderMap = new Map(action.orderedIds.map((id, idx) => [id, idx]))
-      return {
-        ...state,
-        sessions: state.sessions.map((s) =>
-          s.date === action.date && orderMap.has(s.id)
-            ? { ...s, order: orderMap.get(s.id) as number, manuallyAdjusted: true }
-            : s,
-        ),
-      }
-    }
-
-    case 'UPDATE_SESSION_DURATION':
-      return {
-        ...state,
-        sessions: state.sessions.map((s) =>
-          s.id === action.id ? { ...s, plannedMinutes: Math.max(1, action.minutes), manuallyAdjusted: true } : s,
-        ),
-      }
-
-    case 'SET_DAY_OVERRIDE':
-      return withRegeneratedPlan({
-        ...state,
-        dayOverrides: { ...state.dayOverrides, [action.override.date]: action.override },
-      })
-
-    case 'CLEAR_DAY_OVERRIDE': {
-      const next = { ...state.dayOverrides }
-      delete next[action.date]
-      return withRegeneratedPlan({ ...state, dayOverrides: next })
-    }
-
-    case 'REGENERATE_PLAN':
-      return withRegeneratedPlan(state)
-
-    case 'START_SESSION': {
-      const now = new Date().toISOString()
-      const target = state.sessions.find((s) => s.id === action.sessionId)
-      if (!target) return state
-      const sessions = state.sessions.map((s) => {
-        if (s.id === action.sessionId) {
-          return { ...s, status: 'in-progress' as SessionStatus, startedAt: s.startedAt ?? now }
-        }
-        if (s.status === 'in-progress') {
-          return { ...s, status: 'planned' as SessionStatus, startedAt: null }
-        }
-        return s
-      })
-      const timer: ActiveTimer = {
-        sessionId: target.id,
-        itemId: target.itemId,
-        startedAt: now,
-        accumulatedSeconds: 0,
-        isPaused: false,
-      }
-      return { ...state, sessions, activeTimer: timer }
-    }
-
-    case 'STOP_TIMER': {
-      if (!state.activeTimer) return state
-      const sessionId = state.activeTimer.sessionId
-      return {
-        ...state,
-        activeTimer: null,
-        sessions: state.sessions.map((s) => (s.id === sessionId ? { ...s, status: 'planned', startedAt: null } : s)),
-      }
-    }
-
-    case 'COMPLETE_SESSION': {
-      const now = new Date().toISOString()
-      const session = state.sessions.find((s) => s.id === action.sessionId)
-      if (!session) return state
-      const sessions = state.sessions.map((s) =>
-        s.id === action.sessionId
-          ? { ...s, status: 'completed' as SessionStatus, actualMinutes: action.actualMinutes, completedAt: now }
-          : s,
-      )
-      const withCompletion = { ...state, sessions }
-      const items = markItemCompletionFromSessions(withCompletion, session.itemId)
-      const activeTimer = state.activeTimer?.sessionId === action.sessionId ? null : state.activeTimer
-      return { ...withCompletion, items, activeTimer }
-    }
-
-    case 'LOAD_DEMO_DATA': {
-      const goal = buildDemoGoal()
-      const items = buildDemoItems()
-      return withRegeneratedPlan({
-        ...state,
-        goal,
-        items,
-        sessions: [],
-        dayOverrides: {},
-        activeTimer: null,
-        demoDataLoaded: true,
-      })
-    }
-
-    case 'RESET_DATA':
-      return { ...createEmptyState() }
-
-    default:
-      return state
-  }
+function pickInitialActiveGoalId(goals: StudyGoal[]): string | null {
+  const stored = loadActiveGoalId()
+  if (stored && goals.some((g) => g.id === stored)) return stored
+  return goals[0]?.id ?? null
 }
 
 interface CompletionResult {
@@ -228,32 +79,46 @@ interface CompletionResult {
 
 interface StudyContextValue {
   state: AppState
+  activeGoal: StudyGoal | null
+  items: StudyItem[]
+  sessions: StudySession[]
+  dayOverrides: Record<string, DayOverride>
+
   isLoading: boolean
   loadError: string | null
   syncError: string | null
   clearSyncError: () => void
   retryLoad: () => void
-  setGoal: (goal: StudyGoal) => void
+
+  setActiveGoalId: (goalId: string) => void
+  createGoal: (values: GoalInput) => Promise<StudyGoal>
+  updateGoal: (id: string, values: Partial<GoalInput> & { status?: GoalStatus }) => Promise<void>
+  duplicateGoal: (id: string, name?: string) => Promise<void>
+  deleteGoal: (id: string) => Promise<void>
+
   addItem: (item: StudyItem) => void
   addItems: (items: StudyItem[]) => void
   updateItem: (item: StudyItem) => void
   deleteItem: (id: string) => void
   toggleItemComplete: (id: string, completed: boolean) => void
   setItemMastery: (id: string, mastery: MasteryRating) => void
+
   moveSession: (id: string, date: string) => void
   reorderDay: (date: string, orderedIds: string[]) => void
   updateSessionDuration: (id: string, minutes: number) => void
-  setDayOverride: (override: DayOverride) => void
-  clearDayOverride: (date: string) => void
+  setDayOverride: (goalId: string, date: string, unavailable: boolean, hoursOverride: number | null) => void
+  clearDayOverride: (goalId: string, date: string) => void
   regeneratePlanNow: () => void
+
   startSession: (sessionId: string) => void
   pauseTimer: () => void
   resumeTimer: () => void
   stopTimer: () => void
   completeSession: (sessionId: string, actualMinutes: number) => CompletionResult
   completeActiveTimer: () => CompletionResult | null
+
   loadDemoData: () => void
-  importData: (data: { goal: StudyGoal | null; items: StudyItem[]; sessions: StudySession[]; dayOverrides: Record<string, DayOverride> }) => Promise<void>
+  importData: (payload: MultiGoalPayload) => Promise<void>
   resetData: () => void
   exportData: () => void
 }
@@ -275,10 +140,13 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     setSyncError(err instanceof Error ? err.message : fallback)
   }, [])
 
-  // Persist the timer locally on every change (client-only, not synced to the backend).
   useEffect(() => {
     saveActiveTimer(state.activeTimer)
   }, [state.activeTimer])
+
+  useEffect(() => {
+    saveActiveGoalId(state.activeGoalId)
+  }, [state.activeGoalId])
 
   // Initial load from the backend (the source of truth for permanent data).
   useEffect(() => {
@@ -286,37 +154,38 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
     setLoadError(null)
 
-    Promise.all([goalsApi.fetchGoal(), studyItemsApi.fetchItems(), studySessionsApi.fetchSessions(), dayOverridesApi.fetchDayOverrides()])
-      .then(async ([goal, items, sessions, dayOverridesList]) => {
+    Promise.all([goalsApi.fetchGoals(), studyItemsApi.fetchItems(), studySessionsApi.fetchSessions(), dayOverridesApi.fetchDayOverrides()])
+      .then(async ([goals, items, sessions, dayOverrides]) => {
         if (cancelled) return
-        const dayOverrides = Object.fromEntries(dayOverridesList.map((o) => [o.date, o]))
         const persistedTimer = loadActiveTimer()
         const timerSessionStillActive = persistedTimer && sessions.some((s) => s.id === persistedTimer.sessionId && s.status === 'in-progress')
 
         let loaded: AppState = {
-          goal,
+          goals,
+          activeGoalId: pickInitialActiveGoalId(goals),
           items,
           sessions,
           dayOverrides,
           activeTimer: timerSessionStillActive ? persistedTimer : null,
-          demoDataLoaded: false,
         }
 
-        // Quietly reflow the plan once if sessions were left "planned" in the past
-        // (e.g. the user missed a day) — mirrors the original localStorage behavior.
+        // Quietly reflow any goal that has sessions left "planned" in the past
+        // (e.g. the user missed a day) — mirrors the original single-goal behavior,
+        // now applied per goal.
         const today = todayISO()
-        const hasMissed = loaded.sessions.some((s) => s.date < today && s.status === 'planned')
-        if (hasMissed && loaded.goal) {
-          const regenerated = withRegeneratedPlan(loaded)
-          if (regenerated.sessions !== loaded.sessions) {
-            try {
-              const saved = await studySessionsApi.replaceAllSessions(regenerated.sessions)
-              loaded = { ...regenerated, sessions: saved }
-            } catch {
-              // Non-fatal: keep the locally-regenerated plan even if the sync failed;
-              // it will retry next time an action triggers a regenerate.
-              loaded = regenerated
-            }
+        for (const goal of goals) {
+          const hasMissed = loaded.sessions.some((s) => s.goalId === goal.id && s.date < today && s.status === 'planned')
+          if (!hasMissed) continue
+          const regenerated = regenerateSessionsForGoal(loaded, goal.id)
+          if (regenerated === loaded.sessions) continue
+          loaded = { ...loaded, sessions: regenerated }
+          try {
+            const goalSessions = regenerated.filter((s) => s.goalId === goal.id)
+            const saved = await studySessionsApi.replaceAllSessions(goal.id, goalSessions)
+            const others = loaded.sessions.filter((s) => s.goalId !== goal.id)
+            loaded = { ...loaded, sessions: [...others, ...saved] }
+          } catch {
+            // Non-fatal: keep the locally-regenerated plan even if the sync failed.
           }
         }
 
@@ -339,154 +208,350 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   const retryLoad = useCallback(() => setLoadNonce((n) => n + 1), [])
   const clearSyncError = useCallback(() => setSyncError(null), [])
 
+  const setActiveGoalId = useCallback((goalId: string) => {
+    setState((prev) => ({ ...prev, activeGoalId: goalId }))
+  }, [])
+
+  /** Optimistic local update + async persistence, used by the item/session/override actions. */
   const applyAndPersist = useCallback(
-    (action: Action, persist: (prev: AppState, next: AppState) => Promise<void>) => {
+    (compute: (prev: AppState) => AppState, persist: (prev: AppState, next: AppState) => Promise<void>) => {
       const prev = stateRef.current
-      const next = reducer(prev, action)
+      const next = compute(prev)
       setState(next)
       persist(prev, next).catch((err) => reportSyncError(err, 'Failed to save your change.'))
     },
     [reportSyncError],
   )
 
-  const syncPlanIfChanged = async (prev: AppState, next: AppState) => {
-    if (next.sessions !== prev.sessions) {
-      const saved = await studySessionsApi.replaceAllSessions(next.sessions)
-      setState((current) => (current.sessions === next.sessions ? { ...current, sessions: saved } : current))
-    }
-  }
+  /** Persists whatever `goalId`'s sessions currently look like in the latest state, reconciling ids from the server response. */
+  const persistGoalSessions = useCallback(async (goalId: string) => {
+    const sessionsForGoal = stateRef.current.sessions.filter((s) => s.goalId === goalId)
+    const saved = await studySessionsApi.replaceAllSessions(goalId, sessionsForGoal)
+    setState((current) => {
+      const others = current.sessions.filter((s) => s.goalId !== goalId)
+      return { ...current, sessions: [...others, ...saved] }
+    })
+  }, [])
 
-  const setGoal = useCallback(
-    (goal: StudyGoal) =>
-      applyAndPersist({ type: 'SET_GOAL', goal }, async (prev, next) => {
-        const saved = await goalsApi.saveGoal(goal)
-        setState((current) => (current.goal === next.goal ? { ...current, goal: saved } : current))
-        await syncPlanIfChanged(prev, next)
-      }),
-    [applyAndPersist],
+  // ---- Goals ----
+
+  const createGoal = useCallback(async (values: GoalInput): Promise<StudyGoal> => {
+    try {
+      const created = await goalsApi.createGoal(values)
+      setState((prev) => ({ ...prev, goals: [...prev.goals, created], activeGoalId: created.id }))
+      return created
+    } catch (err) {
+      reportSyncError(err, 'Failed to create goal.')
+      throw err
+    }
+  }, [reportSyncError])
+
+  const updateGoal = useCallback(
+    async (id: string, values: Partial<GoalInput> & { status?: GoalStatus }) => {
+      try {
+        const updated = await goalsApi.updateGoal(id, values)
+        setState((prev) => ({ ...prev, goals: prev.goals.map((g) => (g.id === id ? updated : g)) }))
+      } catch (err) {
+        reportSyncError(err, 'Failed to update goal.')
+        throw err
+      }
+    },
+    [reportSyncError],
   )
+
+  const duplicateGoal = useCallback(
+    async (id: string, name?: string) => {
+      try {
+        const { goal, items } = await goalsApi.duplicateGoal(id, name)
+        setState((prev) => ({ ...prev, goals: [...prev.goals, goal], items: [...prev.items, ...items], activeGoalId: goal.id }))
+      } catch (err) {
+        reportSyncError(err, 'Failed to duplicate goal.')
+        throw err
+      }
+    },
+    [reportSyncError],
+  )
+
+  const deleteGoal = useCallback(
+    async (id: string) => {
+      try {
+        await goalsApi.deleteGoal(id)
+        setState((prev) => {
+          const goals = prev.goals.filter((g) => g.id !== id)
+          const items = prev.items.filter((i) => i.goalId !== id)
+          const sessions = prev.sessions.filter((s) => s.goalId !== id)
+          const dayOverrides = prev.dayOverrides.filter((o) => o.goalId !== id)
+          const activeGoalId = prev.activeGoalId === id ? (goals[0]?.id ?? null) : prev.activeGoalId
+          const activeTimer = prev.activeTimer?.goalId === id ? null : prev.activeTimer
+          return { ...prev, goals, items, sessions, dayOverrides, activeGoalId, activeTimer }
+        })
+      } catch (err) {
+        reportSyncError(err, 'Failed to delete goal.')
+        throw err
+      }
+    },
+    [reportSyncError],
+  )
+
+  // ---- Study items (always operate on whatever goal the item belongs to) ----
 
   const addItem = useCallback(
     (item: StudyItem) =>
-      applyAndPersist({ type: 'ADD_ITEM', item }, async (prev, next) => {
-        await studyItemsApi.createItem(item)
-        await syncPlanIfChanged(prev, next)
-      }),
-    [applyAndPersist],
+      applyAndPersist(
+        (prev) => {
+          const items = [...prev.items, item]
+          const sessions = regenerateSessionsForGoal({ ...prev, items }, item.goalId)
+          return { ...prev, items, sessions }
+        },
+        async () => {
+          await studyItemsApi.createItem(item)
+          await persistGoalSessions(item.goalId)
+        },
+      ),
+    [applyAndPersist, persistGoalSessions],
   )
 
   const addItems = useCallback(
     (items: StudyItem[]) =>
-      applyAndPersist({ type: 'ADD_ITEMS', items }, async (prev, next) => {
-        await studyItemsApi.bulkCreateItems(items)
-        await syncPlanIfChanged(prev, next)
-      }),
-    [applyAndPersist],
+      applyAndPersist(
+        (prev) => {
+          const nextItems = [...prev.items, ...items]
+          const goalIds = Array.from(new Set(items.map((i) => i.goalId)))
+          let sessions = prev.sessions
+          let working = { ...prev, items: nextItems }
+          for (const goalId of goalIds) {
+            sessions = regenerateSessionsForGoal(working, goalId)
+            working = { ...working, sessions }
+          }
+          return { ...prev, items: nextItems, sessions }
+        },
+        async () => {
+          await studyItemsApi.bulkCreateItems(items)
+          const goalIds = Array.from(new Set(items.map((i) => i.goalId)))
+          await Promise.all(goalIds.map((goalId) => persistGoalSessions(goalId)))
+        },
+      ),
+    [applyAndPersist, persistGoalSessions],
   )
 
   const updateItem = useCallback(
     (item: StudyItem) =>
-      applyAndPersist({ type: 'UPDATE_ITEM', item }, async (prev, next) => {
-        await studyItemsApi.updateItem(item)
-        await syncPlanIfChanged(prev, next)
-      }),
-    [applyAndPersist],
+      applyAndPersist(
+        (prev) => {
+          const items = prev.items.map((i) => (i.id === item.id ? item : i))
+          const sessions = regenerateSessionsForGoal({ ...prev, items }, item.goalId)
+          return { ...prev, items, sessions }
+        },
+        async () => {
+          await studyItemsApi.updateItem(item)
+          await persistGoalSessions(item.goalId)
+        },
+      ),
+    [applyAndPersist, persistGoalSessions],
   )
 
   const deleteItem = useCallback(
-    (id: string) =>
-      applyAndPersist({ type: 'DELETE_ITEM', id }, async (prev, next) => {
-        await studyItemsApi.deleteItem(id)
-        await syncPlanIfChanged(prev, next)
-      }),
-    [applyAndPersist],
+    (id: string) => {
+      const goalId = stateRef.current.items.find((i) => i.id === id)?.goalId
+      applyAndPersist(
+        (prev) => {
+          const items = prev.items.filter((i) => i.id !== id)
+          const sessions = prev.sessions.filter((s) => s.itemId !== id)
+          if (!goalId) return { ...prev, items, sessions }
+          return { ...prev, items, sessions: regenerateSessionsForGoal({ ...prev, items, sessions }, goalId) }
+        },
+        async () => {
+          await studyItemsApi.deleteItem(id)
+          if (goalId) await persistGoalSessions(goalId)
+        },
+      )
+    },
+    [applyAndPersist, persistGoalSessions],
   )
 
   const toggleItemComplete = useCallback(
     (id: string, completed: boolean) =>
-      applyAndPersist({ type: 'TOGGLE_ITEM_COMPLETE', id, completed }, async (prev, next) => {
-        const item = next.items.find((i) => i.id === id)
-        if (item) await studyItemsApi.updateItem(item)
-        await syncPlanIfChanged(prev, next)
-      }),
-    [applyAndPersist],
+      applyAndPersist(
+        (prev) => {
+          const now = new Date().toISOString()
+          const items = prev.items.map((i) =>
+            i.id === id ? { ...i, completed, completedDate: completed ? now : null } : i,
+          )
+          const sessions = prev.sessions.map((s) =>
+            s.itemId === id
+              ? completed
+                ? { ...s, status: 'completed' as SessionStatus, actualMinutes: s.actualMinutes ?? s.plannedMinutes, completedAt: now }
+                : { ...s, status: 'planned' as SessionStatus, actualMinutes: null, completedAt: null }
+              : s,
+          )
+          const item = items.find((i) => i.id === id)
+          if (!item) return { ...prev, items, sessions }
+          return { ...prev, items, sessions: regenerateSessionsForGoal({ ...prev, items, sessions }, item.goalId) }
+        },
+        async (_prev, next) => {
+          const item = next.items.find((i) => i.id === id)
+          if (item) {
+            await studyItemsApi.updateItem(item)
+            await persistGoalSessions(item.goalId)
+          }
+        },
+      ),
+    [applyAndPersist, persistGoalSessions],
   )
 
   const setItemMastery = useCallback(
     (id: string, mastery: MasteryRating) =>
-      applyAndPersist({ type: 'SET_ITEM_MASTERY', id, mastery }, async (_prev, next) => {
-        const item = next.items.find((i) => i.id === id)
-        if (item) await studyItemsApi.updateItem(item)
-      }),
+      applyAndPersist(
+        (prev) => ({ ...prev, items: prev.items.map((i) => (i.id === id ? { ...i, mastery } : i)) }),
+        async (_prev, next) => {
+          const item = next.items.find((i) => i.id === id)
+          if (item) await studyItemsApi.updateItem(item)
+        },
+      ),
     [applyAndPersist],
   )
 
+  // ---- Sessions ----
+
   const moveSession = useCallback(
     (id: string, date: string) =>
-      applyAndPersist({ type: 'MOVE_SESSION', id, date }, async (_prev, next) => {
-        const session = next.sessions.find((s) => s.id === id)
-        if (session) await studySessionsApi.updateSession(id, { date: session.date, order: session.order, manuallyAdjusted: true })
-      }),
+      applyAndPersist(
+        (prev) => {
+          const target = prev.sessions.filter((s) => s.date === date)
+          const nextOrder = target.length === 0 ? 0 : Math.max(...target.map((s) => s.order)) + 1
+          return {
+            ...prev,
+            sessions: prev.sessions.map((s) => (s.id === id ? { ...s, date, order: nextOrder, manuallyAdjusted: true } : s)),
+          }
+        },
+        async (_prev, next) => {
+          const session = next.sessions.find((s) => s.id === id)
+          if (session) await studySessionsApi.updateSession(id, { date: session.date, order: session.order, manuallyAdjusted: true })
+        },
+      ),
     [applyAndPersist],
   )
 
   const reorderDay = useCallback(
-    (date: string, orderedIds: string[]) =>
-      applyAndPersist({ type: 'REORDER_DAY', date, orderedIds }, async () => {
-        await studySessionsApi.reorderSessions(date, orderedIds)
-      }),
+    (date: string, orderedIds: string[]) => {
+      const goalId = stateRef.current.sessions.find((s) => orderedIds.includes(s.id))?.goalId
+      applyAndPersist(
+        (prev) => {
+          const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]))
+          return {
+            ...prev,
+            sessions: prev.sessions.map((s) =>
+              s.date === date && orderMap.has(s.id) ? { ...s, order: orderMap.get(s.id) as number, manuallyAdjusted: true } : s,
+            ),
+          }
+        },
+        async () => {
+          if (goalId) await studySessionsApi.reorderSessions(goalId, date, orderedIds)
+        },
+      )
+    },
     [applyAndPersist],
   )
 
   const updateSessionDuration = useCallback(
     (id: string, minutes: number) =>
-      applyAndPersist({ type: 'UPDATE_SESSION_DURATION', id, minutes }, async (_prev, next) => {
-        const session = next.sessions.find((s) => s.id === id)
-        if (session) await studySessionsApi.updateSession(id, { plannedMinutes: session.plannedMinutes, manuallyAdjusted: true })
-      }),
+      applyAndPersist(
+        (prev) => ({
+          ...prev,
+          sessions: prev.sessions.map((s) => (s.id === id ? { ...s, plannedMinutes: Math.max(1, minutes), manuallyAdjusted: true } : s)),
+        }),
+        async (_prev, next) => {
+          const session = next.sessions.find((s) => s.id === id)
+          if (session) await studySessionsApi.updateSession(id, { plannedMinutes: session.plannedMinutes, manuallyAdjusted: true })
+        },
+      ),
     [applyAndPersist],
   )
 
   const setDayOverride = useCallback(
-    (override: DayOverride) =>
-      applyAndPersist({ type: 'SET_DAY_OVERRIDE', override }, async (prev, next) => {
-        await dayOverridesApi.upsertDayOverride(override)
-        await syncPlanIfChanged(prev, next)
-      }),
-    [applyAndPersist],
+    (goalId: string, date: string, unavailable: boolean, hoursOverride: number | null) =>
+      applyAndPersist(
+        (prev) => {
+          const existing = prev.dayOverrides.find((o) => o.goalId === goalId && o.date === date)
+          const next: DayOverride = { id: existing?.id ?? generateId('override'), goalId, date, unavailable, hoursOverride }
+          const dayOverrides = existing
+            ? prev.dayOverrides.map((o) => (o.goalId === goalId && o.date === date ? next : o))
+            : [...prev.dayOverrides, next]
+          return { ...prev, dayOverrides, sessions: regenerateSessionsForGoal({ ...prev, dayOverrides }, goalId) }
+        },
+        async () => {
+          const saved = await dayOverridesApi.upsertDayOverride(goalId, date, unavailable, hoursOverride)
+          setState((current) => ({
+            ...current,
+            dayOverrides: current.dayOverrides.map((o) => (o.goalId === goalId && o.date === date ? saved : o)),
+          }))
+          await persistGoalSessions(goalId)
+        },
+      ),
+    [applyAndPersist, persistGoalSessions],
   )
 
   const clearDayOverride = useCallback(
-    (date: string) =>
-      applyAndPersist({ type: 'CLEAR_DAY_OVERRIDE', date }, async (prev, next) => {
-        await dayOverridesApi.deleteDayOverride(date)
-        await syncPlanIfChanged(prev, next)
-      }),
-    [applyAndPersist],
+    (goalId: string, date: string) =>
+      applyAndPersist(
+        (prev) => {
+          const dayOverrides = prev.dayOverrides.filter((o) => !(o.goalId === goalId && o.date === date))
+          return { ...prev, dayOverrides, sessions: regenerateSessionsForGoal({ ...prev, dayOverrides }, goalId) }
+        },
+        async () => {
+          await dayOverridesApi.deleteDayOverride(goalId, date)
+          await persistGoalSessions(goalId)
+        },
+      ),
+    [applyAndPersist, persistGoalSessions],
   )
 
-  const regeneratePlanNow = useCallback(
-    () =>
-      applyAndPersist({ type: 'REGENERATE_PLAN' }, async (prev, next) => {
-        await syncPlanIfChanged(prev, next)
-      }),
-    [applyAndPersist],
-  )
+  const regeneratePlanNow = useCallback(() => {
+    const goalId = stateRef.current.activeGoalId
+    if (!goalId) return
+    applyAndPersist(
+      (prev) => ({ ...prev, sessions: regenerateSessionsForGoal(prev, goalId) }),
+      async () => {
+        await persistGoalSessions(goalId)
+      },
+    )
+  }, [applyAndPersist, persistGoalSessions])
+
+  // ---- Timer ----
 
   const startSession = useCallback(
     (sessionId: string) =>
-      applyAndPersist({ type: 'START_SESSION', sessionId }, async (prev, next) => {
-        const requests: Promise<unknown>[] = []
-        for (const nextSession of next.sessions) {
-          const prevSession = prev.sessions.find((s) => s.id === nextSession.id)
-          if (prevSession && (prevSession.status !== nextSession.status || prevSession.startedAt !== nextSession.startedAt)) {
-            requests.push(
-              studySessionsApi.updateSession(nextSession.id, { status: nextSession.status, startedAt: nextSession.startedAt }),
-            )
+      applyAndPersist(
+        (prev) => {
+          const now = new Date().toISOString()
+          const target = prev.sessions.find((s) => s.id === sessionId)
+          if (!target) return prev
+          const sessions = prev.sessions.map((s) => {
+            if (s.id === sessionId) return { ...s, status: 'in-progress' as SessionStatus, startedAt: s.startedAt ?? now }
+            if (s.status === 'in-progress') return { ...s, status: 'planned' as SessionStatus, startedAt: null }
+            return s
+          })
+          const timer: ActiveTimer = {
+            sessionId: target.id,
+            itemId: target.itemId,
+            goalId: target.goalId,
+            startedAt: now,
+            accumulatedSeconds: 0,
+            isPaused: false,
           }
-        }
-        await Promise.all(requests)
-      }),
+          return { ...prev, sessions, activeTimer: timer }
+        },
+        async (prev, next) => {
+          const requests: Promise<unknown>[] = []
+          for (const nextSession of next.sessions) {
+            const prevSession = prev.sessions.find((s) => s.id === nextSession.id)
+            if (prevSession && (prevSession.status !== nextSession.status || prevSession.startedAt !== nextSession.startedAt)) {
+              requests.push(studySessionsApi.updateSession(nextSession.id, { status: nextSession.status, startedAt: nextSession.startedAt }))
+            }
+          }
+          await Promise.all(requests)
+        },
+      ),
     [applyAndPersist],
   )
 
@@ -507,13 +572,21 @@ export function StudyProvider({ children }: { children: ReactNode }) {
 
   const stopTimer = useCallback(
     () =>
-      applyAndPersist({ type: 'STOP_TIMER' }, async (_prev, next) => {
-        const timer = stateRef.current.activeTimer
-        if (timer) {
-          const session = next.sessions.find((s) => s.id === timer.sessionId)
-          if (session) await studySessionsApi.updateSession(timer.sessionId, { status: 'planned', startedAt: null })
-        }
-      }),
+      applyAndPersist(
+        (prev) => {
+          if (!prev.activeTimer) return prev
+          const sessionId = prev.activeTimer.sessionId
+          return {
+            ...prev,
+            activeTimer: null,
+            sessions: prev.sessions.map((s) => (s.id === sessionId ? { ...s, status: 'planned' as SessionStatus, startedAt: null } : s)),
+          }
+        },
+        async () => {
+          const timer = stateRef.current.activeTimer
+          if (timer) await studySessionsApi.updateSession(timer.sessionId, { status: 'planned', startedAt: null })
+        },
+      ),
     [applyAndPersist],
   )
 
@@ -525,17 +598,28 @@ export function StudyProvider({ children }: { children: ReactNode }) {
       const otherIncomplete = current.sessions.some((s) => s.itemId === itemId && s.id !== sessionId && s.status !== 'completed')
       const roundedMinutes = Math.max(1, Math.round(actualMinutes))
 
-      applyAndPersist({ type: 'COMPLETE_SESSION', sessionId, actualMinutes: roundedMinutes }, async (_prev, next) => {
-        await studySessionsApi.updateSession(sessionId, {
-          status: 'completed',
-          actualMinutes: roundedMinutes,
-          completedAt: new Date().toISOString(),
-        })
-        const item = next.items.find((i) => i.id === itemId)
-        if (item && !otherIncomplete) {
-          await studyItemsApi.updateItem(item)
-        }
-      })
+      applyAndPersist(
+        (prev) => {
+          const now = new Date().toISOString()
+          const sessions = prev.sessions.map((s) =>
+            s.id === sessionId ? { ...s, status: 'completed' as SessionStatus, actualMinutes: roundedMinutes, completedAt: now } : s,
+          )
+          const items = markItemCompletionFromSessions(sessions, prev.items, itemId)
+          const activeTimer = prev.activeTimer?.sessionId === sessionId ? null : prev.activeTimer
+          return { ...prev, sessions, items, activeTimer }
+        },
+        async (_prev, next) => {
+          await studySessionsApi.updateSession(sessionId, {
+            status: 'completed',
+            actualMinutes: roundedMinutes,
+            completedAt: new Date().toISOString(),
+          })
+          const item = next.items.find((i) => i.id === itemId)
+          if (item && !otherIncomplete) {
+            await studyItemsApi.updateItem(item)
+          }
+        },
+      )
 
       return { itemCompleted: !otherIncomplete, itemId }
     },
@@ -551,44 +635,89 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     return completeSession(timer.sessionId, actualMinutes)
   }, [completeSession])
 
-  const loadDemoData = useCallback(
-    () =>
-      applyAndPersist({ type: 'LOAD_DEMO_DATA' }, async (_prev, next) => {
-        await dataApi.restoreData({ goal: next.goal, items: next.items, sessions: next.sessions, dayOverrides: next.dayOverrides })
-      }),
-    [applyAndPersist],
-  )
+  // ---- Bulk data operations ----
 
-  const importData = useCallback(
-    async (data: { goal: StudyGoal | null; items: StudyItem[]; sessions: StudySession[]; dayOverrides: Record<string, DayOverride> }) => {
-      await dataApi.restoreData(data)
-      setState({ ...data, activeTimer: null, demoDataLoaded: false })
-    },
-    [],
-  )
+  const loadDemoData = useCallback(async () => {
+    try {
+      const goalInput = buildDemoGoal()
+      const createdGoal = await goalsApi.createGoal(goalInput)
+      const demoItemsInput = buildDemoItems(createdGoal.id)
+      const createdItems = await studyItemsApi.bulkCreateItems(demoItemsInput)
 
-  const resetData = useCallback(
-    () =>
-      applyAndPersist({ type: 'RESET_DATA' }, async () => {
-        await dataApi.wipeAllData()
-      }),
-    [applyAndPersist],
-  )
+      setState((prev) => {
+        const goals = [...prev.goals, createdGoal]
+        const items = [...prev.items, ...createdItems]
+        const sessions = regenerateSessionsForGoal({ ...prev, goals, items }, createdGoal.id)
+        return { ...prev, goals, items, sessions, activeGoalId: createdGoal.id }
+      })
+
+      const goalSessions = regenerateSessionsForGoal(
+        { ...stateRef.current, goals: [...stateRef.current.goals, createdGoal], items: [...stateRef.current.items, ...createdItems] },
+        createdGoal.id,
+      ).filter((s) => s.goalId === createdGoal.id)
+      await studySessionsApi.replaceAllSessions(createdGoal.id, goalSessions)
+    } catch (err) {
+      reportSyncError(err, 'Failed to load demo data.')
+    }
+  }, [reportSyncError])
+
+  const importData = useCallback(async (payload: MultiGoalPayload) => {
+    await dataApi.restoreData(payload)
+    setLoadNonce((n) => n + 1)
+  }, [])
+
+  const resetData = useCallback(async () => {
+    try {
+      await dataApi.wipeAllData()
+      setState({ ...createEmptyState() })
+    } catch (err) {
+      reportSyncError(err, 'Failed to reset your data.')
+    }
+  }, [reportSyncError])
 
   const exportData = useCallback(() => {
-    const { goal, items, sessions, dayOverrides } = stateRef.current
-    downloadJson('studyflow-backup', { version: '2', goal, items, sessions, dayOverrides })
+    const { goals, items, sessions, dayOverrides } = stateRef.current
+    const bundles = goals.map((goal) => ({
+      id: goal.id,
+      name: goal.name,
+      startDate: goal.startDate,
+      deadline: goal.deadline,
+      dailyHours: goal.dailyHours,
+      status: goal.status,
+      items: items.filter((i) => i.goalId === goal.id),
+      sessions: sessions.filter((s) => s.goalId === goal.id),
+      dayOverrides: Object.fromEntries(dayOverrides.filter((o) => o.goalId === goal.id).map((o) => [o.date, o])),
+    }))
+    downloadJson('studyflow-backup', { version: '3', goals: bundles })
   }, [])
+
+  // ---- Derived active-goal view ----
+
+  const activeGoal = useMemo(() => state.goals.find((g) => g.id === state.activeGoalId) ?? null, [state.goals, state.activeGoalId])
+  const activeItems = useMemo(() => state.items.filter((i) => i.goalId === state.activeGoalId), [state.items, state.activeGoalId])
+  const activeSessions = useMemo(() => state.sessions.filter((s) => s.goalId === state.activeGoalId), [state.sessions, state.activeGoalId])
+  const activeDayOverrides = useMemo(
+    () => (state.activeGoalId ? dayOverridesMapForGoal(state.dayOverrides, state.activeGoalId) : {}),
+    [state.dayOverrides, state.activeGoalId],
+  )
 
   const value = useMemo<StudyContextValue>(
     () => ({
       state,
+      activeGoal,
+      items: activeItems,
+      sessions: activeSessions,
+      dayOverrides: activeDayOverrides,
       isLoading,
       loadError,
       syncError,
       clearSyncError,
       retryLoad,
-      setGoal,
+      setActiveGoalId,
+      createGoal,
+      updateGoal,
+      duplicateGoal,
+      deleteGoal,
       addItem,
       addItems,
       updateItem,
@@ -614,12 +743,20 @@ export function StudyProvider({ children }: { children: ReactNode }) {
     }),
     [
       state,
+      activeGoal,
+      activeItems,
+      activeSessions,
+      activeDayOverrides,
       isLoading,
       loadError,
       syncError,
       clearSyncError,
       retryLoad,
-      setGoal,
+      setActiveGoalId,
+      createGoal,
+      updateGoal,
+      duplicateGoal,
+      deleteGoal,
       addItem,
       addItems,
       updateItem,

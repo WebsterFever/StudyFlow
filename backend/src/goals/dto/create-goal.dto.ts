@@ -1,7 +1,7 @@
 import { IsDateString, IsObject, IsString, MaxLength, MinLength } from 'class-validator';
 import type { DailyHours } from '../goal.entity';
 
-export class UpsertGoalDto {
+export class CreateGoalDto {
   @IsString()
   @MinLength(1, { message: 'Goal name cannot be empty.' })
   @MaxLength(255)

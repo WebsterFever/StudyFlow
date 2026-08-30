@@ -1,19 +1,20 @@
-import type { ActiveTimer, AppState, DayOverride, StudyGoal, StudyItem, StudySession } from '../types'
+import type { ActiveTimer, AppState, DailyHours, Difficulty, MasteryRating, Priority, SessionStatus, StudyType } from '../types'
 import { DAYS_OF_WEEK } from '../types'
 
 const TIMER_KEY = 'studyflow_timer_v1'
 const LEGACY_KEY = 'studyflow_v1'
 const LEGACY_BACKUP_KEY = 'studyflow_v1_backup'
 const MIGRATION_DISMISSED_KEY = 'studyflow_migration_dismissed'
+const ACTIVE_GOAL_KEY = 'studyflow_active_goal_id'
 
 export function createEmptyState(): AppState {
   return {
-    goal: null,
+    goals: [],
+    activeGoalId: null,
     items: [],
     sessions: [],
-    dayOverrides: {},
+    dayOverrides: [],
     activeTimer: null,
-    demoDataLoaded: false,
   }
 }
 
@@ -38,13 +39,73 @@ export function saveActiveTimer(timer: ActiveTimer | null): void {
   }
 }
 
-// ---- Legacy pre-auth data (old studyflow_v1 blob), used for one-time migration ----
+// ---- Active goal selection: a UI preference only. The goal data itself
+// always lives in PostgreSQL — this just remembers which one to show. ----
+
+export function loadActiveGoalId(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_GOAL_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function saveActiveGoalId(goalId: string | null): void {
+  try {
+    if (goalId) localStorage.setItem(ACTIVE_GOAL_KEY, goalId)
+    else localStorage.removeItem(ACTIVE_GOAL_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+// ---- Legacy pre-auth data (old single-goal studyflow_v1 blob), used for one-time migration ----
+// Shaped to match what the pre-multi-goal app actually wrote: no goalId on
+// items/sessions/overrides, no status on the goal.
+
+export interface LegacyStudyItem {
+  id: string
+  title: string
+  course: string
+  topic: string
+  type: StudyType
+  durationMinutes: number
+  difficulty: Difficulty
+  priority: Priority
+  completed: boolean
+  completedDate: string | null
+  mastery: MasteryRating | null
+  notes: string
+  createdDate: string
+  order: number
+}
+
+export interface LegacyStudySession {
+  id: string
+  itemId: string
+  date: string
+  order: number
+  plannedMinutes: number
+  partIndex: number
+  partTotal: number
+  status: SessionStatus
+  actualMinutes: number | null
+  startedAt: string | null
+  completedAt: string | null
+  manuallyAdjusted: boolean
+}
+
+export interface LegacyDayOverride {
+  date: string
+  unavailable: boolean
+  hoursOverride: number | null
+}
 
 export interface LegacyAppState {
-  goal: StudyGoal | null
-  items: StudyItem[]
-  sessions: StudySession[]
-  dayOverrides: Record<string, DayOverride>
+  goal: { id: string; name: string; startDate: string; deadline: string; dailyHours: DailyHours } | null
+  items: LegacyStudyItem[]
+  sessions: LegacyStudySession[]
+  dayOverrides: Record<string, LegacyDayOverride>
 }
 
 function isValidLegacyState(data: unknown): data is LegacyAppState {

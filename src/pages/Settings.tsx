@@ -2,22 +2,14 @@ import { useRef, useState } from 'react'
 import { AlertCircle, Database, Download, LogOut, Mail, Sparkles, Trash2, Upload, User as UserIcon } from 'lucide-react'
 import { useStudy } from '../hooks/useStudy'
 import { useAuth } from '../hooks/useAuth'
-import { GoalForm } from '../components/settings/GoalForm'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { readJsonFile } from '../services/storage'
-import type { DayOverride, StudyGoal, StudyItem, StudySession } from '../types'
-
-interface BackupFile {
-  goal: StudyGoal | null
-  items: StudyItem[]
-  sessions: StudySession[]
-  dayOverrides: Record<string, DayOverride>
-}
+import type { MultiGoalPayload } from '../services/dataApi'
 
 export default function Settings() {
-  const { state, setGoal, exportData, importData, resetData, loadDemoData } = useStudy()
+  const { exportData, importData, resetData, loadDemoData } = useStudy()
   const { user, logout } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -34,16 +26,11 @@ export default function Settings() {
     if (!file) return
     setImportBusy(true)
     try {
-      const data = await readJsonFile<BackupFile>(file)
-      if (!data || !Array.isArray(data.items) || !Array.isArray(data.sessions)) {
+      const data = await readJsonFile<MultiGoalPayload>(file)
+      if (!data || !Array.isArray(data.goals)) {
         throw new Error('That file does not look like a valid StudyFlow backup.')
       }
-      await importData({
-        goal: data.goal ?? null,
-        items: data.items,
-        sessions: data.sessions,
-        dayOverrides: data.dayOverrides ?? {},
-      })
+      await importData(data)
       setImportError(null)
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Failed to import file.')
@@ -71,16 +58,14 @@ export default function Settings() {
         </div>
       </Card>
 
-      <GoalForm goal={state.goal} onSave={setGoal} />
-
       <Card>
-        <CardHeader title="Demo data" subtitle="Load sample content covering HTML, CSS, JavaScript, TypeScript and React" />
+        <CardHeader title="Demo data" subtitle="Add a sample goal covering HTML, CSS, JavaScript, TypeScript and React" />
         <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-          This replaces your current goal and content with a ready-made example so you can try StudyFlow immediately. You can clear it any time
-          from Reset All Data below.
+          This adds a new "Master Frontend Development" goal alongside any goals you already have, so you can try StudyFlow immediately without
+          losing anything. You can delete it any time from the Goals page.
         </p>
         <Button variant="secondary" icon={<Sparkles size={16} />} onClick={() => setConfirmDemo(true)}>
-          Load demo data
+          Add demo goal
         </Button>
       </Card>
 
@@ -95,7 +80,7 @@ export default function Settings() {
           </Button>
           <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleFileChange} />
         </div>
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Importing replaces your current goal, content and schedule.</p>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Importing replaces every goal, all content and every schedule in your account.</p>
         {importError && (
           <p className="mt-3 flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
             <AlertCircle size={14} /> {importError}
@@ -107,7 +92,7 @@ export default function Settings() {
         <CardHeader title="Danger zone" subtitle="This cannot be undone" />
         <div className="flex items-center gap-3 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">
           <Database size={16} />
-          Reset all data — deletes your goal, content, sessions and history from your account.
+          Reset all data — deletes every goal, all content, sessions and history from your account.
         </div>
         <div className="mt-3">
           <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => setConfirmReset(true)}>
@@ -119,7 +104,7 @@ export default function Settings() {
       <ConfirmDialog
         open={confirmReset}
         title="Reset all data?"
-        message="This will permanently delete your goal, study content, plan and history from your account. This cannot be undone."
+        message="This will permanently delete every goal, all study content, plans and history from your account. This cannot be undone."
         confirmLabel="Reset everything"
         danger
         onConfirm={() => {
@@ -131,9 +116,9 @@ export default function Settings() {
 
       <ConfirmDialog
         open={confirmDemo}
-        title="Load demo data?"
-        message="This will replace your current goal and study content with sample data. Any existing plan will be regenerated."
-        confirmLabel="Load demo data"
+        title="Add demo goal?"
+        message="This adds a new sample goal with ready-made content alongside your existing goals."
+        confirmLabel="Add demo goal"
         onConfirm={() => {
           loadDemoData()
           setConfirmDemo(false)

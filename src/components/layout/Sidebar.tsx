@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { Flame, GraduationCap, LogOut } from 'lucide-react'
 import { NAV_ITEMS } from './navConfig'
+import { GoalSwitcher } from './GoalSwitcher'
 import { useStudy } from '../../hooks/useStudy'
 import { useAuth } from '../../hooks/useAuth'
 import { computeStreak } from '../../utils/streak'
@@ -21,6 +22,8 @@ export function Sidebar() {
           <p className="text-xs text-slate-500 dark:text-slate-400">Study planner</p>
         </div>
       </div>
+
+      <GoalSwitcher />
 
       <nav className="flex-1 space-y-1 px-3 py-2">
         {NAV_ITEMS.map((item) => (

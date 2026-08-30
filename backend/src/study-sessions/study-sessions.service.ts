@@ -6,6 +6,7 @@ import { StudyItem } from '../study-items/study-item.entity';
 import { CreateStudySessionDto } from './dto/create-study-session.dto';
 import { UpdateStudySessionDto } from './dto/update-study-session.dto';
 import { ReorderSessionsDto } from './dto/reorder-sessions.dto';
+import { GoalsService } from '../goals/goals.service';
 
 @Injectable()
 export class StudySessionsService {
@@ -14,25 +15,40 @@ export class StudySessionsService {
     private readonly sessionsRepository: Repository<StudySession>,
     @InjectRepository(StudyItem)
     private readonly itemsRepository: Repository<StudyItem>,
+    private readonly goalsService: GoalsService,
   ) {}
 
-  findAllForUser(userId: string): Promise<StudySession[]> {
-    return this.sessionsRepository.find({ where: { userId }, order: { date: 'ASC', order: 'ASC' } });
+  findAllForUser(userId: string, goalId?: string): Promise<StudySession[]> {
+    return this.sessionsRepository.find({
+      where: goalId ? { userId, goalId } : { userId },
+      order: { date: 'ASC', order: 'ASC' },
+    });
   }
 
-  private async assertItemsOwnedByUser(userId: string, itemIds: string[]): Promise<void> {
+  /**
+   * Loads the items referenced by `itemIds`, verifying every one belongs to
+   * `userId` and (when `goalId` is given) to that specific goal — a session's
+   * goal is always derived from its item server-side, never trusted from the client.
+   */
+  private async loadOwnedItems(userId: string, itemIds: string[], goalId?: string): Promise<Map<string, StudyItem>> {
     const uniqueIds = Array.from(new Set(itemIds));
-    if (uniqueIds.length === 0) return;
-    const owned = await this.itemsRepository.count({ where: { userId, id: In(uniqueIds) } });
-    if (owned !== uniqueIds.length) {
+    if (uniqueIds.length === 0) return new Map();
+    const items = await this.itemsRepository.find({ where: { userId, id: In(uniqueIds) } });
+    if (items.length !== uniqueIds.length) {
       throw new BadRequestException('One or more sessions reference a study item that does not belong to you.');
     }
+    if (goalId && items.some((i) => i.goalId !== goalId)) {
+      throw new BadRequestException('One or more sessions reference an item from a different goal.');
+    }
+    return new Map(items.map((i) => [i.id, i]));
   }
 
   async create(userId: string, dto: CreateStudySessionDto): Promise<StudySession> {
-    await this.assertItemsOwnedByUser(userId, [dto.itemId]);
+    const itemsById = await this.loadOwnedItems(userId, [dto.itemId]);
+    const item = itemsById.get(dto.itemId)!;
     const session = this.sessionsRepository.create({
       ...dto,
+      goalId: item.goalId,
       partIndex: dto.partIndex ?? 1,
       partTotal: dto.partTotal ?? 1,
       status: dto.status ?? 'planned',
@@ -42,20 +58,27 @@ export class StudySessionsService {
   }
 
   /**
-   * Full transactional replace, used after the frontend's plan generator
-   * (utils/planGenerator.ts) recomputes the entire session list client-side.
-   * The backend does not recompute the plan itself — it only persists it.
+   * Full transactional replace **scoped to one goal**, used after the
+   * frontend's plan generator (utils/planGenerator.ts) recomputes that goal's
+   * session list client-side. Only ever touches sessions belonging to `goalId`
+   * — other goals' schedules are untouched. The backend never recomputes the
+   * plan itself, it only persists what the frontend already computed.
    */
-  async replaceAll(userId: string, sessions: CreateStudySessionDto[]): Promise<StudySession[]> {
-    await this.assertItemsOwnedByUser(
+  async replaceAll(userId: string, goalId: string, sessions: CreateStudySessionDto[]): Promise<StudySession[]> {
+    await this.goalsService.assertOwnership(userId, goalId);
+    // Verifies every referenced item belongs to this user and this exact goal; throws otherwise.
+    await this.loadOwnedItems(
       userId,
       sessions.map((s) => s.itemId),
+      goalId,
     );
+
     return this.sessionsRepository.manager.transaction(async (manager) => {
-      await manager.delete(StudySession, { userId });
+      await manager.delete(StudySession, { userId, goalId });
       const entities = sessions.map((dto) =>
         manager.create(StudySession, {
           ...dto,
+          goalId,
           partIndex: dto.partIndex ?? 1,
           partTotal: dto.partTotal ?? 1,
           status: dto.status ?? 'planned',
@@ -83,7 +106,7 @@ export class StudySessionsService {
 
   async reorder(userId: string, dto: ReorderSessionsDto): Promise<StudySession[]> {
     return this.sessionsRepository.manager.transaction(async (manager) => {
-      const sessions = await manager.find(StudySession, { where: { userId, date: dto.date } });
+      const sessions = await manager.find(StudySession, { where: { userId, goalId: dto.goalId, date: dto.date } });
       const byId = new Map(sessions.map((s) => [s.id, s]));
       const updated: StudySession[] = [];
       dto.orderedIds.forEach((id, index) => {

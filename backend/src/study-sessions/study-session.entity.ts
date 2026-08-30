@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '../users/user.entity';
 import { StudyItem } from '../study-items/study-item.entity';
+import { StudyGoal } from '../goals/goal.entity';
 
 export type SessionStatus = 'planned' | 'in-progress' | 'completed' | 'skipped';
 
@@ -9,8 +10,8 @@ export class StudySession {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  // Denormalized alongside the itemId relation so every query can be scoped
-  // to `WHERE userId = :userId` without a join, and ownership checks stay cheap.
+  // Denormalized alongside the itemId/goalId relations so every query can be
+  // scoped to `WHERE userId = :userId` (or goalId) without a join.
   @Index()
   @Column({ type: 'uuid' })
   userId: string;
@@ -18,6 +19,14 @@ export class StudySession {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  @Index()
+  @Column({ type: 'uuid' })
+  goalId: string;
+
+  @ManyToOne(() => StudyGoal, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'goalId' })
+  goal: StudyGoal;
 
   @Index()
   @Column({ type: 'uuid' })

@@ -148,6 +148,7 @@ export function regeneratePlan(
     parts.forEach((part, idx) => {
       generated.push({
         id: generateId('session'),
+        goalId: goal.id,
         itemId: item.id,
         date: part.date,
         order: 0,

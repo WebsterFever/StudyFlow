@@ -28,8 +28,7 @@ const TYPE_COLORS: Record<string, string> = {
 const CHART_AXIS = { fontSize: 12, fill: '#64748b' }
 
 export default function Statistics() {
-  const { state } = useStudy()
-  const { items, sessions } = state
+  const { items, sessions } = useStudy()
 
   if (items.length === 0) {
     return (

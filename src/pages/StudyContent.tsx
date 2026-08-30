@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { BookOpen, CheckCircle2, Circle, Layers, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { BookOpen, CheckCircle2, Circle, Layers, Pencil, Plus, Search, Target, Trash2 } from 'lucide-react'
 import { useStudy } from '../hooks/useStudy'
 import type { StudyItem } from '../types'
 import { Card } from '../components/ui/Card'
@@ -19,8 +20,7 @@ const PRIORITY_WEIGHT: Record<string, number> = { High: 0, Medium: 1, Low: 2 }
 const DIFFICULTY_WEIGHT: Record<string, number> = { Easy: 0, Intermediate: 1, Hard: 2 }
 
 export default function StudyContent() {
-  const { state, addItem, addItems, updateItem, deleteItem, toggleItemComplete } = useStudy()
-  const { items } = state
+  const { items, activeGoal, addItem, addItems, updateItem, deleteItem, toggleItemComplete } = useStudy()
 
   const [search, setSearch] = useState('')
   const [course, setCourse] = useState('all')
@@ -87,6 +87,21 @@ export default function StudyContent() {
     setFormOpen(false)
   }
 
+  if (!activeGoal) {
+    return (
+      <EmptyState
+        icon={<Target size={40} />}
+        title="No study goal yet"
+        description="Create a goal to start adding study content."
+        action={
+          <Link to="/goals">
+            <Button>Create a goal</Button>
+          </Link>
+        }
+      />
+    )
+  }
+
   if (items.length === 0) {
     return (
       <div className="space-y-4">
@@ -105,8 +120,18 @@ export default function StudyContent() {
             </div>
           }
         />
-        <ContentFormModal open={formOpen} onClose={() => setFormOpen(false)} onSave={handleSave} initial={editingItem} existingCourses={courses} existingTopics={topics} nextOrder={nextOrder} />
-        <BulkAddModal open={bulkOpen} onClose={() => setBulkOpen(false)} onAdd={addItems} existingCourses={courses} nextOrder={nextOrder} />
+        <ContentFormModal
+          open={formOpen}
+          onClose={() => setFormOpen(false)}
+          onSave={handleSave}
+          initial={editingItem}
+          existingCourses={courses}
+          existingTopics={topics}
+          nextOrder={nextOrder}
+          goalId={activeGoal.id}
+          goalName={activeGoal.name}
+        />
+        <BulkAddModal open={bulkOpen} onClose={() => setBulkOpen(false)} onAdd={addItems} existingCourses={courses} nextOrder={nextOrder} goalId={activeGoal.id} />
       </div>
     )
   }
@@ -271,8 +296,18 @@ export default function StudyContent() {
         </Card>
       )}
 
-      <ContentFormModal open={formOpen} onClose={() => setFormOpen(false)} onSave={handleSave} initial={editingItem} existingCourses={courses} existingTopics={topics} nextOrder={nextOrder} />
-      <BulkAddModal open={bulkOpen} onClose={() => setBulkOpen(false)} onAdd={addItems} existingCourses={courses} nextOrder={nextOrder} />
+      <ContentFormModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onSave={handleSave}
+        initial={editingItem}
+        existingCourses={courses}
+        existingTopics={topics}
+        nextOrder={nextOrder}
+        goalId={activeGoal.id}
+        goalName={activeGoal.name}
+      />
+      <BulkAddModal open={bulkOpen} onClose={() => setBulkOpen(false)} onAdd={addItems} existingCourses={courses} nextOrder={nextOrder} goalId={activeGoal.id} />
       <ConfirmDialog
         open={deletingItem != null}
         title="Delete study item"

@@ -44,16 +44,30 @@ export const DAYS_OF_WEEK: DayOfWeek[] = [
 
 export type DailyHours = Record<DayOfWeek, number>
 
+export type GoalStatus = 'active' | 'completed' | 'paused'
+
+export const GOAL_STATUSES: GoalStatus[] = ['active', 'completed', 'paused']
+
 export interface StudyGoal {
   id: string
   name: string
   startDate: string // ISO yyyy-mm-dd
   deadline: string // ISO yyyy-mm-dd
   dailyHours: DailyHours
+  status: GoalStatus
+}
+
+/** The editable fields of a goal — what a create/edit form collects, before the backend assigns id/status. */
+export interface GoalInput {
+  name: string
+  startDate: string
+  deadline: string
+  dailyHours: DailyHours
 }
 
 export interface StudyItem {
   id: string
+  goalId: string
   title: string
   course: string
   topic: string
@@ -73,6 +87,7 @@ export type SessionStatus = 'planned' | 'in-progress' | 'completed' | 'skipped'
 
 export interface StudySession {
   id: string
+  goalId: string
   itemId: string
   date: string // ISO yyyy-mm-dd, planned date
   order: number // order within the day
@@ -87,6 +102,8 @@ export interface StudySession {
 }
 
 export interface DayOverride {
+  id: string
+  goalId: string
   date: string // ISO yyyy-mm-dd
   unavailable: boolean
   hoursOverride: number | null // null = use goal's default hours for that weekday
@@ -108,6 +125,7 @@ export interface StudyHistoryEntry {
 export interface ActiveTimer {
   sessionId: string
   itemId: string
+  goalId: string
   startedAt: string // ISO datetime of the current run start
   accumulatedSeconds: number // seconds banked from previous runs (before pause)
   isPaused: boolean
@@ -124,15 +142,18 @@ export interface ReviewSuggestion {
 
 export type DeadlineStatus = 'on-track' | 'at-risk' | 'behind' | 'no-goal'
 
+/**
+ * The full state held by StudyContext: every goal, plus every item/session/
+ * day-override across ALL goals (not just the active one). Per-goal views
+ * are derived by filtering on `goalId` rather than re-fetching on switch,
+ * which is what makes switching goals instant and lets "All Goals" views
+ * (Today, combined workload) work without extra requests.
+ */
 export interface AppState {
-  goal: StudyGoal | null
+  goals: StudyGoal[]
+  activeGoalId: string | null
   items: StudyItem[]
   sessions: StudySession[]
-  dayOverrides: Record<string, DayOverride>
+  dayOverrides: DayOverride[]
   activeTimer: ActiveTimer | null
-  demoDataLoaded: boolean
-}
-
-export interface PersistedData extends AppState {
-  version: string
 }

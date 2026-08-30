@@ -28,11 +28,11 @@ export function MigrationPrompt() {
 
   useEffect(() => {
     if (isLoading || !user || user.localDataMigratedAt || isMigrationPromptDismissed()) return
-    const accountIsEmpty = !state.goal && state.items.length === 0
+    const accountIsEmpty = state.goals.length === 0
     if (!accountIsEmpty) return
     const legacy = loadLegacyData()
     if (legacy) setOpen(true)
-  }, [isLoading, user, state.goal, state.items.length])
+  }, [isLoading, user, state.goals.length])
 
   const legacy = loadLegacyData()
   if (!open || !legacy) return null
@@ -41,12 +41,7 @@ export function MigrationPrompt() {
     setBusy(true)
     setError(null)
     try {
-      const result = await dataApi.migrateLocalData({
-        goal: legacy.goal,
-        items: legacy.items,
-        sessions: legacy.sessions,
-        dayOverrides: legacy.dayOverrides,
-      })
+      const result = await dataApi.migrateLocalData(legacy)
       if (result.migrated || result.alreadyMigrated) {
         archiveLegacyData()
         markLocalDataMigrated()

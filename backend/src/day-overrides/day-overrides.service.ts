@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DayOverride } from './day-override.entity';
 import { UpsertDayOverrideDto } from './dto/upsert-day-override.dto';
+import { GoalsService } from '../goals/goals.service';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -11,17 +12,20 @@ export class DayOverridesService {
   constructor(
     @InjectRepository(DayOverride)
     private readonly overridesRepository: Repository<DayOverride>,
+    private readonly goalsService: GoalsService,
   ) {}
 
-  findAllForUser(userId: string): Promise<DayOverride[]> {
-    return this.overridesRepository.find({ where: { userId } });
+  findAllForUser(userId: string, goalId?: string): Promise<DayOverride[]> {
+    return this.overridesRepository.find({ where: goalId ? { userId, goalId } : { userId } });
   }
 
-  async upsert(userId: string, date: string, dto: UpsertDayOverrideDto): Promise<DayOverride> {
+  async upsert(userId: string, goalId: string, date: string, dto: UpsertDayOverrideDto): Promise<DayOverride> {
     if (!DATE_PATTERN.test(date)) {
       throw new BadRequestException('Date must be in yyyy-mm-dd format.');
     }
-    const existing = await this.overridesRepository.findOne({ where: { userId, date } });
+    await this.goalsService.assertOwnership(userId, goalId);
+
+    const existing = await this.overridesRepository.findOne({ where: { userId, goalId, date } });
     if (existing) {
       existing.unavailable = dto.unavailable;
       existing.hoursOverride = dto.hoursOverride ?? null;
@@ -29,6 +33,7 @@ export class DayOverridesService {
     }
     const override = this.overridesRepository.create({
       userId,
+      goalId,
       date,
       unavailable: dto.unavailable,
       hoursOverride: dto.hoursOverride ?? null,
@@ -36,8 +41,8 @@ export class DayOverridesService {
     return this.overridesRepository.save(override);
   }
 
-  async remove(userId: string, date: string): Promise<void> {
-    const result = await this.overridesRepository.delete({ userId, date });
+  async remove(userId: string, goalId: string, date: string): Promise<void> {
+    const result = await this.overridesRepository.delete({ userId, goalId, date });
     if (result.affected === 0) {
       throw new NotFoundException('Day override not found.');
     }

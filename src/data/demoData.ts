@@ -1,4 +1,4 @@
-import type { Difficulty, Priority, StudyGoal, StudyItem, StudyType } from '../types'
+import type { Difficulty, GoalInput, Priority, StudyItem, StudyType } from '../types'
 import { addDays, todayISO } from '../utils/date'
 import { generateId } from '../utils/id'
 
@@ -59,10 +59,11 @@ const ROWS: DemoRow[] = [
   { title: 'Review: HTML & CSS Fundamentals', course: 'HTML', topic: 'HTML Fundamentals', type: 'Review', minutes: 30, difficulty: 'Easy', priority: 'Low' },
 ]
 
-export function buildDemoItems(): StudyItem[] {
+export function buildDemoItems(goalId: string): StudyItem[] {
   const now = new Date().toISOString()
   return ROWS.map((row, index) => ({
     id: generateId('item'),
+    goalId,
     title: row.title,
     course: row.course,
     topic: row.topic,
@@ -79,9 +80,8 @@ export function buildDemoItems(): StudyItem[] {
   }))
 }
 
-export function buildDemoGoal(): StudyGoal {
+export function buildDemoGoal(): GoalInput {
   return {
-    id: generateId('goal'),
     name: 'Master Frontend Development',
     startDate: todayISO(),
     deadline: addDays(todayISO(), 42),

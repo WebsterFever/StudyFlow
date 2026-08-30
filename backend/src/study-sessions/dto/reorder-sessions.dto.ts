@@ -1,6 +1,9 @@
 import { ArrayMinSize, IsArray, IsDateString, IsUUID } from 'class-validator';
 
 export class ReorderSessionsDto {
+  @IsUUID()
+  goalId: string;
+
   @IsDateString()
   date: string;
 

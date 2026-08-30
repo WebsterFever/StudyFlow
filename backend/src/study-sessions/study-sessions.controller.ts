@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, type AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { StudySessionsService } from './study-sessions.service';
@@ -13,8 +13,8 @@ export class StudySessionsController {
   constructor(private readonly studySessionsService: StudySessionsService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.studySessionsService.findAllForUser(user.id);
+  findAll(@CurrentUser() user: AuthenticatedUser, @Query('goalId') goalId?: string) {
+    return this.studySessionsService.findAllForUser(user.id, goalId);
   }
 
   @Post()
@@ -22,10 +22,10 @@ export class StudySessionsController {
     return this.studySessionsService.create(user.id, dto);
   }
 
-  /** Replaces the user's entire session list — how the plan generator persists a recalculated plan. */
+  /** Replaces one goal's entire session list — how the plan generator persists a recalculated plan. */
   @Put()
   replaceAll(@CurrentUser() user: AuthenticatedUser, @Body() dto: ReplaceSessionsDto) {
-    return this.studySessionsService.replaceAll(user.id, dto.sessions);
+    return this.studySessionsService.replaceAll(user.id, dto.goalId, dto.sessions);
   }
 
   @Patch('reorder')

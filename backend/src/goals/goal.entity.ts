@@ -11,14 +11,16 @@ export interface DailyHours {
   sunday: number;
 }
 
-// One row per user: the app's data model only ever has a single "current" goal,
-// enforced here with a unique index on userId (see GoalsService.upsert).
+export type GoalStatus = 'active' | 'completed' | 'paused';
+
+// A user can have many goals (Infnet, Frontend Mastery, React Advanced, ...),
+// each with its own independent study items, sessions and schedule.
 @Entity('study_goals')
 export class StudyGoal {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Index({ unique: true })
+  @Index()
   @Column({ type: 'uuid' })
   userId: string;
 
@@ -37,6 +39,9 @@ export class StudyGoal {
 
   @Column({ type: 'jsonb' })
   dailyHours: DailyHours;
+
+  @Column({ type: 'varchar', length: 16, default: 'active' })
+  status: GoalStatus;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

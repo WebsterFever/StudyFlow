@@ -1,15 +1,20 @@
-import type { StudyGoal } from '../types'
+import type { GoalInput, GoalStatus, StudyGoal, StudyItem } from '../types'
 import { apiRequest } from './api'
 
-export async function fetchGoal(): Promise<StudyGoal | null> {
-  const goals = await apiRequest<StudyGoal[]>('/goals')
-  return goals[0] ?? null
+export function fetchGoals(): Promise<StudyGoal[]> {
+  return apiRequest<StudyGoal[]>('/goals')
 }
 
-/** Create-or-replace: the app only ever has one active goal per user. */
-export function saveGoal(goal: StudyGoal): Promise<StudyGoal> {
-  const { name, startDate, deadline, dailyHours } = goal
-  return apiRequest<StudyGoal>('/goals', { method: 'POST', body: { name, startDate, deadline, dailyHours } })
+export function createGoal(input: GoalInput): Promise<StudyGoal> {
+  return apiRequest<StudyGoal>('/goals', { method: 'POST', body: input })
+}
+
+export function updateGoal(id: string, patch: Partial<GoalInput> & { status?: GoalStatus }): Promise<StudyGoal> {
+  return apiRequest<StudyGoal>(`/goals/${id}`, { method: 'PATCH', body: patch })
+}
+
+export function duplicateGoal(id: string, name?: string): Promise<{ goal: StudyGoal; items: StudyItem[] }> {
+  return apiRequest<{ goal: StudyGoal; items: StudyItem[] }>(`/goals/${id}/duplicate`, { method: 'POST', body: { name } })
 }
 
 export function deleteGoal(id: string): Promise<void> {

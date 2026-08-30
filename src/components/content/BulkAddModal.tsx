@@ -14,6 +14,7 @@ interface BulkAddModalProps {
   onAdd: (items: StudyItem[]) => void
   existingCourses: string[]
   nextOrder: number
+  goalId: string
 }
 
 const PLACEHOLDER = `React Basics | Video | 120
@@ -36,9 +37,11 @@ function newRow(): TableRow {
 function buildItem(
   values: { title: string; course: string; topic: string; type: StudyType; minutes: number; difficulty: Difficulty; priority: Priority },
   order: number,
+  goalId: string,
 ): StudyItem {
   return {
     id: generateId('item'),
+    goalId,
     title: values.title,
     course: values.course,
     topic: values.topic,
@@ -55,7 +58,7 @@ function buildItem(
   }
 }
 
-export function BulkAddModal({ open, onClose, onAdd, existingCourses, nextOrder }: BulkAddModalProps) {
+export function BulkAddModal({ open, onClose, onAdd, existingCourses, nextOrder, goalId }: BulkAddModalProps) {
   const [mode, setMode] = useState<'paste' | 'table'>('paste')
   const [course, setCourse] = useState(existingCourses[0] ?? '')
   const [topic, setTopic] = useState('')
@@ -82,7 +85,11 @@ export function BulkAddModal({ open, onClose, onAdd, existingCourses, nextOrder 
     if (mode === 'paste') {
       if (result.rows.length === 0) return
       const items = result.rows.map((row, idx) =>
-        buildItem({ title: row.title, course: row.course, topic: row.topic, type: row.type, minutes: row.minutes, difficulty: row.difficulty, priority: row.priority }, nextOrder + idx),
+        buildItem(
+          { title: row.title, course: row.course, topic: row.topic, type: row.type, minutes: row.minutes, difficulty: row.difficulty, priority: row.priority },
+          nextOrder + idx,
+          goalId,
+        ),
       )
       onAdd(items)
     } else {
@@ -91,6 +98,7 @@ export function BulkAddModal({ open, onClose, onAdd, existingCourses, nextOrder 
         buildItem(
           { title: row.title.trim(), course: course.trim(), topic: topic.trim() || 'General', type: row.type, minutes: Math.round(Number(row.minutes)), difficulty, priority },
           nextOrder + idx,
+          goalId,
         ),
       )
       onAdd(items)

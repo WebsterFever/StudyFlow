@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser, type AuthenticatedUser } from '../common/decorators/current-user.decorator';
 import { StudyItemsService } from './study-items.service';
@@ -12,8 +12,8 @@ export class StudyItemsController {
   constructor(private readonly studyItemsService: StudyItemsService) {}
 
   @Get()
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.studyItemsService.findAllForUser(user.id);
+  findAll(@CurrentUser() user: AuthenticatedUser, @Query('goalId') goalId?: string) {
+    return this.studyItemsService.findAllForUser(user.id, goalId);
   }
 
   @Post()

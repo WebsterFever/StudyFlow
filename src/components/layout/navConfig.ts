@@ -2,6 +2,7 @@ import {
   BarChart3,
   BookOpen,
   CalendarRange,
+  Flag,
   LayoutDashboard,
   Settings as SettingsIcon,
   Target,
@@ -18,6 +19,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/goals', label: 'Goals', icon: Flag },
   { to: '/today', label: 'Today', icon: Target },
   { to: '/plan', label: 'Study Plan', icon: CalendarRange },
   { to: '/content', label: 'Study Content', icon: BookOpen },

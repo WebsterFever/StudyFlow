@@ -4,6 +4,7 @@ import type { StudyGoal } from '../types'
 import { useStudy } from '../hooks/useStudy'
 import { StatCard } from '../components/dashboard/StatCard'
 import { DeadlineStatusBanner } from '../components/dashboard/DeadlineStatusBanner'
+import { GoalsOverviewList } from '../components/dashboard/GoalsOverviewList'
 import { SessionListItem } from '../components/session/SessionListItem'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -22,27 +23,36 @@ import { computeStreak } from '../utils/streak'
 import { formatFriendlyDate, formatMinutes, todayISO } from '../utils/date'
 
 export default function Dashboard() {
-  const { state } = useStudy()
-  const { goal, items, sessions } = state
+  const { state, activeGoal, items, sessions, dayOverrides } = useStudy()
   const today = todayISO()
 
-  if (!goal) {
+  if (state.goals.length === 0) {
     return (
       <EmptyState
         icon={<Target size={40} />}
         title="No study goal yet"
-        description="Set a goal, start date and deadline to unlock your personalized study plan."
+        description="Create a goal with a start date and deadline to unlock your personalized study plan."
         action={
-          <Link to="/settings">
-            <Button>Create your study goal</Button>
+          <Link to="/goals">
+            <Button>Create your first goal</Button>
           </Link>
         }
       />
     )
   }
 
+  if (!activeGoal) {
+    return (
+      <EmptyState
+        icon={<Target size={40} />}
+        title="Select a goal"
+        description="Choose a goal from the sidebar to see its dashboard."
+      />
+    )
+  }
+
   const progress = overallProgress(items)
-  const achievability = computeAchievability(items, goal, state.dayOverrides, today)
+  const achievability = computeAchievability(items, activeGoal, dayOverrides, today)
   const streak = computeStreak(sessions, today)
   const todayMinutes = minutesForDate(sessions, today)
   const todaySessions = sessions.filter((s) => s.date === today).sort((a, b) => a.order - b.order)
@@ -51,7 +61,8 @@ export default function Dashboard() {
   if (items.length === 0) {
     return (
       <div className="space-y-6">
-        <GoalHeader goal={goal} daysLeft={daysRemaining(goal, today)} />
+        <GoalHeader goal={activeGoal} daysLeft={daysRemaining(activeGoal, today)} />
+        {state.goals.length > 1 && <GoalsOverviewList />}
         <EmptyState
           icon={<BookOpen size={40} />}
           title="No study content yet"
@@ -68,7 +79,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <GoalHeader goal={goal} daysLeft={daysRemaining(goal, today)} />
+      <GoalHeader goal={activeGoal} daysLeft={daysRemaining(activeGoal, today)} />
 
       <DeadlineStatusBanner achievability={achievability} />
 
@@ -80,7 +91,7 @@ export default function Dashboard() {
           icon={<Clock size={20} />}
           label="Study time remaining"
           value={formatMinutes(totalUnfinishedMinutes(items))}
-          sub={`Available: ${formatMinutes(totalAvailableMinutes(goal, state.dayOverrides, today))}`}
+          sub={`Available: ${formatMinutes(totalAvailableMinutes(activeGoal, dayOverrides, today))}`}
           tone={achievability.achievable ? 'indigo' : 'red'}
         />
       </div>
@@ -120,7 +131,7 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center gap-2">
                 <Calendar size={16} className="text-slate-400" />
-                <span className="text-slate-600 dark:text-slate-300">{daysRemaining(goal, today)} days left</span>
+                <span className="text-slate-600 dark:text-slate-300">{daysRemaining(activeGoal, today)} days left</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={16} className="text-slate-400" />
@@ -134,6 +145,8 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
+
+      {state.goals.length > 1 && <GoalsOverviewList />}
     </div>
   )
 }
@@ -142,7 +155,7 @@ function GoalHeader({ goal, daysLeft }: { goal: StudyGoal; daysLeft: number }) {
   return (
     <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Goal</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Current goal</p>
         <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{goal.name}</h2>
       </div>
       <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900">

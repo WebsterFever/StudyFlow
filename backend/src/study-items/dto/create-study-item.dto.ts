@@ -12,6 +12,9 @@ export class CreateStudyItemDto {
   @IsUUID()
   id?: string;
 
+  @IsUUID(undefined, { message: 'goalId is required.' })
+  goalId: string;
+
   @IsString()
   @MinLength(1, { message: 'Title cannot be empty.' })
   title: string;

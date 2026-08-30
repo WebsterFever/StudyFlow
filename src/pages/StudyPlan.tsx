@@ -8,33 +8,33 @@ import { DayCard } from '../components/plan/DayCard'
 import { DeadlineStatusBanner } from '../components/dashboard/DeadlineStatusBanner'
 import { availableMinutesForDate, computeAchievability } from '../utils/calculations'
 import { addDays, formatFriendlyDate, startOfWeek, todayISO } from '../utils/date'
-import type { DayOverride } from '../types'
 
 export default function StudyPlan() {
-  const { state, setDayOverride, clearDayOverride, moveSession, updateSessionDuration, reorderDay, regeneratePlanNow } = useStudy()
+  const { activeGoal, items, sessions, dayOverrides, setDayOverride, clearDayOverride, moveSession, updateSessionDuration, reorderDay, regeneratePlanNow } =
+    useStudy()
   const [weekStart, setWeekStart] = useState(() => startOfWeek(todayISO()))
 
   const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
-  const itemsById = useMemo(() => new Map(state.items.map((i) => [i.id, i])), [state.items])
+  const itemsById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items])
   const moveOptions = weekDates.map((d) => ({ date: d, label: formatFriendlyDate(d, { withWeekday: true }) }))
 
-  if (!state.goal) {
+  if (!activeGoal) {
     return (
       <EmptyState
         icon={<Target size={40} />}
         title="No study goal yet"
-        description="Set up your goal and daily availability in Settings to generate a study plan."
+        description="Create a goal with daily availability to generate a study plan."
         action={
-          <Link to="/settings">
-            <Button>Set up your goal</Button>
+          <Link to="/goals">
+            <Button>Create a goal</Button>
           </Link>
         }
       />
     )
   }
 
-  const goal = state.goal
-  const achievability = computeAchievability(state.items, goal, state.dayOverrides, todayISO())
+  const goal = activeGoal
+  const achievability = computeAchievability(items, goal, dayOverrides, todayISO())
 
   return (
     <div className="space-y-5">
@@ -70,17 +70,16 @@ export default function StudyPlan() {
 
       <div className="space-y-3">
         {weekDates.map((date) => {
-          const daySessions = state.sessions.filter((s) => s.date === date).sort((a, b) => a.order - b.order)
-          const override = state.dayOverrides[date]
+          const daySessions = sessions.filter((s) => s.date === date).sort((a, b) => a.order - b.order)
+          const override = dayOverrides[date]
           const isUnavailable = override?.unavailable ?? false
-          const availableMinutes = availableMinutesForDate(date, goal, state.dayOverrides)
+          const availableMinutes = availableMinutesForDate(date, goal, dayOverrides)
 
           const toggleUnavailable = () => {
             if (isUnavailable) {
-              clearDayOverride(date)
+              clearDayOverride(goal.id, date)
             } else {
-              const next: DayOverride = { date, unavailable: true, hoursOverride: null }
-              setDayOverride(next)
+              setDayOverride(goal.id, date, true, null)
             }
           }
 

@@ -6,6 +6,7 @@ import { StudyProvider } from './context/StudyContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
+import Goals from './pages/Goals'
 import Today from './pages/Today'
 import StudyPlan from './pages/StudyPlan'
 import StudyContent from './pages/StudyContent'
@@ -30,6 +31,7 @@ function App() {
           }
         >
           <Route path="/" element={<Dashboard />} />
+          <Route path="/goals" element={<Goals />} />
           <Route path="/today" element={<Today />} />
           <Route path="/plan" element={<StudyPlan />} />
           <Route path="/content" element={<StudyContent />} />

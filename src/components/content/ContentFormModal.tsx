@@ -36,9 +36,21 @@ interface ContentFormModalProps {
   existingCourses: string[]
   existingTopics: string[]
   nextOrder: number
+  goalId: string
+  goalName: string
 }
 
-export function ContentFormModal({ open, onClose, onSave, initial, existingCourses, existingTopics, nextOrder }: ContentFormModalProps) {
+export function ContentFormModal({
+  open,
+  onClose,
+  onSave,
+  initial,
+  existingCourses,
+  existingTopics,
+  nextOrder,
+  goalId,
+  goalName,
+}: ContentFormModalProps) {
   const [values, setValues] = useState<ContentFormValues>(EMPTY_FORM)
   const [errors, setErrors] = useState<Partial<Record<keyof ContentFormValues, string>>>({})
 
@@ -85,6 +97,7 @@ export function ContentFormModal({ open, onClose, onSave, initial, existingCours
       ? { ...initial, ...trimmed, type: values.type, durationMinutes: Math.round(minutes), difficulty: values.difficulty, priority: values.priority }
       : {
           id: generateId('item'),
+          goalId,
           ...trimmed,
           type: values.type,
           durationMinutes: Math.round(minutes),
@@ -114,6 +127,11 @@ export function ContentFormModal({ open, onClose, onSave, initial, existingCours
       }
     >
       <div className="space-y-4">
+        {!initial && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Adding content to <span className="font-medium text-slate-700 dark:text-slate-300">{goalName}</span>
+          </p>
+        )}
         <Field label="Title" required error={errors.title}>
           <Input
             value={values.title}

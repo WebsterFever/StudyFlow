@@ -15,10 +15,9 @@ import { generateId } from '../utils/id'
 import type { StudyItem } from '../types'
 
 export default function Progress() {
-  const { state, addItem } = useStudy()
-  const { items } = state
+  const { items, addItem, activeGoal } = useStudy()
 
-  if (items.length === 0) {
+  if (!activeGoal || items.length === 0) {
     return (
       <EmptyState
         icon={<BarChart3 size={40} />}
@@ -48,6 +47,7 @@ export default function Progress() {
     const now = new Date().toISOString()
     const reviewItem: StudyItem = {
       id: generateId('item'),
+      goalId: activeGoal.id,
       title: `Review: ${source.itemTitle}`,
       course: source.course,
       topic: source.topic,

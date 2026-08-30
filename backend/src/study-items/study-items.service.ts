@@ -4,29 +4,35 @@ import { Repository } from 'typeorm';
 import { StudyItem } from './study-item.entity';
 import { CreateStudyItemDto } from './dto/create-study-item.dto';
 import { UpdateStudyItemDto } from './dto/update-study-item.dto';
+import { GoalsService } from '../goals/goals.service';
 
 @Injectable()
 export class StudyItemsService {
   constructor(
     @InjectRepository(StudyItem)
     private readonly itemsRepository: Repository<StudyItem>,
+    private readonly goalsService: GoalsService,
   ) {}
 
-  findAllForUser(userId: string): Promise<StudyItem[]> {
-    return this.itemsRepository.find({ where: { userId }, order: { order: 'ASC', createdDate: 'ASC' } });
+  findAllForUser(userId: string, goalId?: string): Promise<StudyItem[]> {
+    return this.itemsRepository.find({
+      where: goalId ? { userId, goalId } : { userId },
+      order: { order: 'ASC', createdDate: 'ASC' },
+    });
   }
 
-  private async nextOrder(userId: string): Promise<number> {
+  private async nextOrder(userId: string, goalId: string): Promise<number> {
     const max = await this.itemsRepository
       .createQueryBuilder('item')
       .select('MAX(item.order)', 'max')
-      .where('item.userId = :userId', { userId })
+      .where('item.userId = :userId AND item.goalId = :goalId', { userId, goalId })
       .getRawOne<{ max: string | null }>();
     return max?.max != null ? Number(max.max) + 1 : 0;
   }
 
   async create(userId: string, dto: CreateStudyItemDto): Promise<StudyItem> {
-    const order = dto.order ?? (await this.nextOrder(userId));
+    await this.goalsService.assertOwnership(userId, dto.goalId);
+    const order = dto.order ?? (await this.nextOrder(userId, dto.goalId));
     const item = this.itemsRepository.create({
       ...dto,
       notes: dto.notes ?? '',
@@ -37,15 +43,19 @@ export class StudyItemsService {
   }
 
   async bulkCreate(userId: string, items: CreateStudyItemDto[]): Promise<StudyItem[]> {
-    let order = await this.nextOrder(userId);
-    const entities = items.map((dto) =>
-      this.itemsRepository.create({
-        ...dto,
-        notes: dto.notes ?? '',
-        order: dto.order ?? order++,
-        userId,
-      }),
-    );
+    const goalIds = Array.from(new Set(items.map((i) => i.goalId)));
+    await Promise.all(goalIds.map((goalId) => this.goalsService.assertOwnership(userId, goalId)));
+
+    const nextOrderByGoal = new Map<string, number>();
+    for (const goalId of goalIds) {
+      nextOrderByGoal.set(goalId, await this.nextOrder(userId, goalId));
+    }
+
+    const entities = items.map((dto) => {
+      const order = dto.order ?? nextOrderByGoal.get(dto.goalId)!;
+      nextOrderByGoal.set(dto.goalId, order + 1);
+      return this.itemsRepository.create({ ...dto, notes: dto.notes ?? '', order, userId });
+    });
     return this.itemsRepository.save(entities);
   }
 

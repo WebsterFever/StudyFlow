@@ -10,9 +10,11 @@ interface SessionListItemProps {
   onStart?: () => void
   onComplete?: () => void
   isActive?: boolean
+  /** Shown when the list mixes sessions from multiple goals (Today's "All Goals" view). */
+  goalName?: string
 }
 
-export function SessionListItem({ session, item, compact, onStart, onComplete, isActive }: SessionListItemProps) {
+export function SessionListItem({ session, item, compact, onStart, onComplete, isActive, goalName }: SessionListItemProps) {
   if (!item) return null
   const isCompleted = session.status === 'completed'
   const isMissed = session.status === 'skipped'
@@ -38,6 +40,7 @@ export function SessionListItem({ session, item, compact, onStart, onComplete, i
       </button>
 
       <div className="min-w-0 flex-1">
+        {goalName && <p className="truncate text-[11px] font-medium uppercase tracking-wide text-indigo-500 dark:text-indigo-400">{goalName}</p>}
         <p className={`truncate text-sm font-medium ${isCompleted ? 'text-slate-400 line-through dark:text-slate-500' : 'text-slate-900 dark:text-slate-100'}`}>
           {item.title}
           {partLabel}

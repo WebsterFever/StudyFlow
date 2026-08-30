@@ -1,12 +1,13 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '../users/user.entity';
+import { StudyGoal } from '../goals/goal.entity';
 
 export type StudyType = 'Video' | 'Exercise' | 'Project' | 'Reading' | 'Review';
 export type Difficulty = 'Easy' | 'Intermediate' | 'Hard';
 export type Priority = 'Low' | 'Medium' | 'High';
 
-// Kept intentionally free of a goalId FK: the existing frontend treats study
-// content as one flat pool owned by the user, not partitioned per-goal.
+// Every item belongs to exactly one goal. userId is kept denormalized
+// alongside goalId so ownership checks never need to join through the goal.
 @Entity('study_items')
 export class StudyItem {
   @PrimaryGeneratedColumn('uuid')
@@ -19,6 +20,14 @@ export class StudyItem {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  @Index()
+  @Column({ type: 'uuid' })
+  goalId: string;
+
+  @ManyToOne(() => StudyGoal, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'goalId' })
+  goal: StudyGoal;
 
   @Column({ type: 'varchar', length: 255 })
   title: string;
