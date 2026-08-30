@@ -1,5 +1,7 @@
-import { IsDateString, IsObject, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import type { DailyHours } from '../goal.entity';
+
+export const REMINDER_INTERVAL_HOURS_OPTIONS = [2, 4, 6, 12, 24];
 
 export class CreateGoalDto {
   @IsString()
@@ -15,4 +17,12 @@ export class CreateGoalDto {
 
   @IsObject()
   dailyHours: DailyHours;
+
+  @IsOptional()
+  @IsBoolean()
+  reminderEnabled?: boolean;
+
+  @IsOptional()
+  @IsIn(REMINDER_INTERVAL_HOURS_OPTIONS, { message: `reminderIntervalHours must be one of: ${REMINDER_INTERVAL_HOURS_OPTIONS.join(', ')}` })
+  reminderIntervalHours?: number;
 }

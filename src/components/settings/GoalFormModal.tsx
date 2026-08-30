@@ -1,11 +1,11 @@
-import type { GoalInput, StudyGoal } from '../../types'
+import type { GoalInput, ReminderSettings, StudyGoal } from '../../types'
 import { Modal } from '../ui/Modal'
 import { GoalForm } from './GoalForm'
 
 interface GoalFormModalProps {
   open: boolean
   onClose: () => void
-  onSave: (values: GoalInput) => void
+  onSave: (values: GoalInput & ReminderSettings) => void
   goal?: StudyGoal | null
 }
 

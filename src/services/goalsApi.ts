@@ -1,15 +1,18 @@
-import type { GoalInput, GoalStatus, StudyGoal, StudyItem } from '../types'
+import type { GoalInput, GoalStatus, ReminderSettings, StudyGoal, StudyItem } from '../types'
 import { apiRequest } from './api'
 
 export function fetchGoals(): Promise<StudyGoal[]> {
   return apiRequest<StudyGoal[]>('/goals')
 }
 
-export function createGoal(input: GoalInput): Promise<StudyGoal> {
+export function createGoal(input: GoalInput & Partial<ReminderSettings>): Promise<StudyGoal> {
   return apiRequest<StudyGoal>('/goals', { method: 'POST', body: input })
 }
 
-export function updateGoal(id: string, patch: Partial<GoalInput> & { status?: GoalStatus }): Promise<StudyGoal> {
+export function updateGoal(
+  id: string,
+  patch: Partial<GoalInput> & Partial<ReminderSettings> & { status?: GoalStatus },
+): Promise<StudyGoal> {
   return apiRequest<StudyGoal>(`/goals/${id}`, { method: 'PATCH', body: patch })
 }
 

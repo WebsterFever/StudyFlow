@@ -15,6 +15,7 @@ interface AuthContextValue {
   logout: () => void
   clearAuthError: () => void
   markLocalDataMigrated: () => void
+  setUserProfile: (user: StoredAuthUser) => void
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
@@ -91,6 +92,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  /** Syncs both React state and persisted storage after a profile update (timezone, quiet hours, ...). */
+  const setUserProfile = useCallback((updated: StoredAuthUser) => {
+    setUser(updated)
+    const stored = loadAuth()
+    if (stored) saveAuth({ accessToken: stored.accessToken, user: updated })
+  }, [])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -102,8 +110,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       clearAuthError,
       markLocalDataMigrated,
+      setUserProfile,
     }),
-    [user, isLoading, authError, register, login, logout, clearAuthError, markLocalDataMigrated],
+    [user, isLoading, authError, register, login, logout, clearAuthError, markLocalDataMigrated, setUserProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

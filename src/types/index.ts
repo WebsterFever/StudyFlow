@@ -48,6 +48,9 @@ export type GoalStatus = 'active' | 'completed' | 'paused'
 
 export const GOAL_STATUSES: GoalStatus[] = ['active', 'completed', 'paused']
 
+export const REMINDER_INTERVAL_HOURS_OPTIONS = [2, 4, 6, 12, 24] as const
+export type ReminderIntervalHours = (typeof REMINDER_INTERVAL_HOURS_OPTIONS)[number]
+
 export interface StudyGoal {
   id: string
   name: string
@@ -55,6 +58,9 @@ export interface StudyGoal {
   deadline: string // ISO yyyy-mm-dd
   dailyHours: DailyHours
   status: GoalStatus
+  reminderEnabled: boolean
+  reminderIntervalHours: number
+  lastReminderSentAt: string | null // ISO datetime
 }
 
 /** The editable fields of a goal — what a create/edit form collects, before the backend assigns id/status. */
@@ -63,6 +69,11 @@ export interface GoalInput {
   startDate: string
   deadline: string
   dailyHours: DailyHours
+}
+
+export interface ReminderSettings {
+  reminderEnabled: boolean
+  reminderIntervalHours: number
 }
 
 export interface StudyItem {

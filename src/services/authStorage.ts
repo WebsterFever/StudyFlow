@@ -8,6 +8,10 @@ export interface StoredAuthUser {
   id: string
   name: string
   email: string
+  timezone: string
+  quietHoursEnabled: boolean
+  quietHoursStart: string | null
+  quietHoursEnd: string | null
   localDataMigratedAt: string | null
 }
 

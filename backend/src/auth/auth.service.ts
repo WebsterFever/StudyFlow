@@ -14,7 +14,24 @@ export interface AuthResult {
     id: string;
     name: string;
     email: string;
+    timezone: string;
+    quietHoursEnabled: boolean;
+    quietHoursStart: string | null;
+    quietHoursEnd: string | null;
     localDataMigratedAt: Date | null;
+  };
+}
+
+function toUserProfile(user: User): AuthResult['user'] {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    timezone: user.timezone,
+    quietHoursEnabled: user.quietHoursEnabled,
+    quietHoursStart: user.quietHoursStart,
+    quietHoursEnd: user.quietHoursEnd,
+    localDataMigratedAt: user.localDataMigratedAt,
   };
 }
 
@@ -28,12 +45,7 @@ export class AuthService {
   private toAuthResult(user: User): AuthResult {
     return {
       accessToken: this.jwtService.sign({ sub: user.id, email: user.email }),
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        localDataMigratedAt: user.localDataMigratedAt,
-      },
+      user: toUserProfile(user),
     };
   }
 
@@ -63,11 +75,6 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException();
     }
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      localDataMigratedAt: user.localDataMigratedAt,
-    };
+    return toUserProfile(user);
   }
 }

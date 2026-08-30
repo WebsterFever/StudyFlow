@@ -7,7 +7,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { GoalFormModal } from '../components/settings/GoalFormModal'
 import { GoalCard } from '../components/goals/GoalCard'
-import type { StudyGoal } from '../types'
+import type { GoalInput, ReminderSettings, StudyGoal } from '../types'
 
 export default function Goals() {
   const { state, setActiveGoalId, createGoal, updateGoal, duplicateGoal, deleteGoal } = useStudy()
@@ -26,7 +26,7 @@ export default function Goals() {
     setFormOpen(true)
   }
 
-  const handleSave = (values: Parameters<typeof createGoal>[0]) => {
+  const handleSave = (values: GoalInput & ReminderSettings) => {
     if (editingGoal) updateGoal(editingGoal.id, values)
     else createGoal(values)
   }

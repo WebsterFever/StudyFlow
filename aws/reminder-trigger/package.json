@@ -1,0 +1,8 @@
+{
+  "name": "studyflow-reminder-trigger",
+  "version": "1.0.0",
+  "description": "AWS Lambda: triggers StudyFlow's reminder job every 2 hours via EventBridge Scheduler.",
+  "type": "module",
+  "main": "index.mjs",
+  "private": true
+}

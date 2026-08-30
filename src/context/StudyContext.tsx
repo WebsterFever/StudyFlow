@@ -7,6 +7,7 @@ import type {
   GoalInput,
   GoalStatus,
   MasteryRating,
+  ReminderSettings,
   SessionStatus,
   StudyGoal,
   StudyItem,
@@ -91,8 +92,8 @@ interface StudyContextValue {
   retryLoad: () => void
 
   setActiveGoalId: (goalId: string) => void
-  createGoal: (values: GoalInput) => Promise<StudyGoal>
-  updateGoal: (id: string, values: Partial<GoalInput> & { status?: GoalStatus }) => Promise<void>
+  createGoal: (values: GoalInput & Partial<ReminderSettings>) => Promise<StudyGoal>
+  updateGoal: (id: string, values: Partial<GoalInput> & Partial<ReminderSettings> & { status?: GoalStatus }) => Promise<void>
   duplicateGoal: (id: string, name?: string) => Promise<void>
   deleteGoal: (id: string) => Promise<void>
 
@@ -235,7 +236,7 @@ export function StudyProvider({ children }: { children: ReactNode }) {
 
   // ---- Goals ----
 
-  const createGoal = useCallback(async (values: GoalInput): Promise<StudyGoal> => {
+  const createGoal = useCallback(async (values: GoalInput & Partial<ReminderSettings>): Promise<StudyGoal> => {
     try {
       const created = await goalsApi.createGoal(values)
       setState((prev) => ({ ...prev, goals: [...prev.goals, created], activeGoalId: created.id }))
@@ -247,7 +248,7 @@ export function StudyProvider({ children }: { children: ReactNode }) {
   }, [reportSyncError])
 
   const updateGoal = useCallback(
-    async (id: string, values: Partial<GoalInput> & { status?: GoalStatus }) => {
+    async (id: string, values: Partial<GoalInput> & Partial<ReminderSettings> & { status?: GoalStatus }) => {
       try {
         const updated = await goalsApi.updateGoal(id, values)
         setState((prev) => ({ ...prev, goals: prev.goals.map((g) => (g.id === id ? updated : g)) }))

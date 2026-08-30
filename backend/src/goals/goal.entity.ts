@@ -43,6 +43,16 @@ export class StudyGoal {
   @Column({ type: 'varchar', length: 16, default: 'active' })
   status: GoalStatus;
 
+  @Column({ type: 'boolean', default: false })
+  reminderEnabled: boolean;
+
+  @Column({ type: 'int', default: 2 })
+  reminderIntervalHours: number;
+
+  // Null until the first reminder email is sent for this goal.
+  @Column({ type: 'timestamptz', nullable: true })
+  lastReminderSentAt: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

@@ -29,6 +29,29 @@ class EnvironmentVariables {
   @IsOptional()
   @IsBooleanString()
   DB_SSL?: string;
+
+  // --- Email reminders (all optional: the app boots fine without them, the
+  // reminder endpoint just responds 503 until they're configured) ---
+  @IsOptional()
+  @IsString()
+  AWS_REGION?: string;
+
+  @IsOptional()
+  @IsString()
+  AWS_ACCESS_KEY_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  AWS_SECRET_ACCESS_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  SES_FROM_EMAIL?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(16, { message: 'REMINDER_JOB_SECRET must be at least 16 characters if set.' })
+  REMINDER_JOB_SECRET?: string;
 }
 
 /** Fails fast on boot if required environment variables are missing/invalid. */

@@ -9,6 +9,7 @@ import { StudyItemsModule } from './study-items/study-items.module';
 import { StudySessionsModule } from './study-sessions/study-sessions.module';
 import { DayOverridesModule } from './day-overrides/day-overrides.module';
 import { DataModule } from './data/data.module';
+import { RemindersModule } from './reminders/reminders.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -21,10 +22,10 @@ import { HealthController } from './health.controller';
         type: 'postgres',
         url: configService.getOrThrow<string>('DATABASE_URL'),
         autoLoadEntities: true,
-        // MVP tradeoff: schema is kept in sync from entities instead of hand-written
-        // migrations. Fine for this project's scope; set DB_SYNCHRONIZE=false once
-        // you introduce real TypeORM migrations for a production-hardened setup.
-        synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true',
+        // Schema changes now go through src/migrations/ (see npm run migration:*),
+        // run manually against Railway's DATABASE_URL before deploying. Synchronize
+        // defaults OFF; only flip it on for quick local experimentation.
+        synchronize: configService.get<string>('DB_SYNCHRONIZE', 'false') === 'true',
         ssl: configService.get<string>('DB_SSL', 'false') === 'true' ? { rejectUnauthorized: false } : false,
       }),
     }),
@@ -35,6 +36,7 @@ import { HealthController } from './health.controller';
     StudySessionsModule,
     DayOverridesModule,
     DataModule,
+    RemindersModule,
   ],
   controllers: [HealthController],
 })

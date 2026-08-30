@@ -1,17 +1,26 @@
 import { useState } from 'react'
 import { Save } from 'lucide-react'
-import type { DailyHours, GoalInput, StudyGoal } from '../../types'
-import { DAYS_OF_WEEK } from '../../types'
-import { Field, Input } from '../ui/Form'
+import type { DailyHours, GoalInput, ReminderSettings, StudyGoal } from '../../types'
+import { DAYS_OF_WEEK, REMINDER_INTERVAL_HOURS_OPTIONS } from '../../types'
+import { Field, Input, Select } from '../ui/Form'
 import { Button } from '../ui/Button'
 import { weekdayLabel } from '../../utils/date'
 import { makeDefaultDailyHours } from '../../services/storage'
 
 interface GoalFormProps {
   goal?: StudyGoal | null
-  onSave: (values: GoalInput) => void
+  onSave: (values: GoalInput & ReminderSettings) => void
   onCancel?: () => void
   submitLabel?: string
+}
+
+function formatLastReminder(iso: string | null): string | null {
+  if (!iso) return null
+  const date = new Date(iso)
+  const dateLabel = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const timeLabel = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  const isToday = new Date().toDateString() === date.toDateString()
+  return `${isToday ? 'Today' : dateLabel} at ${timeLabel}`
 }
 
 export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps) {
@@ -19,6 +28,8 @@ export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps)
   const [startDate, setStartDate] = useState(goal?.startDate ?? '')
   const [deadline, setDeadline] = useState(goal?.deadline ?? '')
   const [dailyHours, setDailyHours] = useState<DailyHours>(goal?.dailyHours ?? makeDefaultDailyHours(2))
+  const [reminderEnabled, setReminderEnabled] = useState(goal?.reminderEnabled ?? false)
+  const [reminderIntervalHours, setReminderIntervalHours] = useState(goal?.reminderIntervalHours ?? 2)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const setHour = (day: keyof DailyHours, value: string) => {
@@ -40,8 +51,10 @@ export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps)
       return
     }
     setErrors({})
-    onSave({ name: name.trim(), startDate, deadline, dailyHours })
+    onSave({ name: name.trim(), startDate, deadline, dailyHours, reminderEnabled, reminderIntervalHours })
   }
+
+  const lastReminderLabel = formatLastReminder(goal?.lastReminderSentAt ?? null)
 
   return (
     <div className="space-y-4">
@@ -80,6 +93,39 @@ export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps)
             </Field>
           ))}
         </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 p-3.5 dark:border-slate-700">
+        <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Email reminders</p>
+        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <input
+            type="checkbox"
+            checked={reminderEnabled}
+            onChange={(e) => setReminderEnabled(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
+          />
+          Remind me about this goal
+        </label>
+
+        {reminderEnabled && (
+          <div className="mt-3">
+            <Field label="Send reminder every">
+              <Select value={reminderIntervalHours} onChange={(e) => setReminderIntervalHours(Number(e.target.value))}>
+                {REMINDER_INTERVAL_HOURS_OPTIONS.map((hours) => (
+                  <option key={hours} value={hours}>
+                    {hours} hours
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        )}
+
+        {lastReminderLabel && (
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            Last reminder: <span className="font-medium text-slate-700 dark:text-slate-300">{lastReminderLabel}</span>
+          </p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2">
