@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Save } from 'lucide-react'
 import type { DailyHours, GoalInput, ReminderSettings, StudyGoal } from '../../types'
-import { DAYS_OF_WEEK, REMINDER_INTERVAL_HOURS_OPTIONS } from '../../types'
+import { DAYS_OF_WEEK, REMINDER_INTERVAL_MINUTES_OPTIONS } from '../../types'
 import { Field, Input, Select } from '../ui/Form'
 import { Button } from '../ui/Button'
 import { weekdayLabel } from '../../utils/date'
@@ -12,6 +12,12 @@ interface GoalFormProps {
   onSave: (values: GoalInput & ReminderSettings) => void
   onCancel?: () => void
   submitLabel?: string
+}
+
+function formatReminderInterval(minutes: number): string {
+  if (minutes < 60) return `${minutes} minutes`
+  const hours = minutes / 60
+  return hours === 1 ? '1 hour' : `${hours} hours`
 }
 
 function formatLastReminder(iso: string | null): string | null {
@@ -29,7 +35,7 @@ export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps)
   const [deadline, setDeadline] = useState(goal?.deadline ?? '')
   const [dailyHours, setDailyHours] = useState<DailyHours>(goal?.dailyHours ?? makeDefaultDailyHours(2))
   const [reminderEnabled, setReminderEnabled] = useState(goal?.reminderEnabled ?? false)
-  const [reminderIntervalHours, setReminderIntervalHours] = useState(goal?.reminderIntervalHours ?? 2)
+  const [reminderIntervalMinutes, setReminderIntervalMinutes] = useState(goal?.reminderIntervalMinutes ?? 120)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const setHour = (day: keyof DailyHours, value: string) => {
@@ -51,7 +57,7 @@ export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps)
       return
     }
     setErrors({})
-    onSave({ name: name.trim(), startDate, deadline, dailyHours, reminderEnabled, reminderIntervalHours })
+    onSave({ name: name.trim(), startDate, deadline, dailyHours, reminderEnabled, reminderIntervalMinutes })
   }
 
   const lastReminderLabel = formatLastReminder(goal?.lastReminderSentAt ?? null)
@@ -110,10 +116,10 @@ export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps)
         {reminderEnabled && (
           <div className="mt-3">
             <Field label="Send reminder every">
-              <Select value={reminderIntervalHours} onChange={(e) => setReminderIntervalHours(Number(e.target.value))}>
-                {REMINDER_INTERVAL_HOURS_OPTIONS.map((hours) => (
-                  <option key={hours} value={hours}>
-                    {hours} hours
+              <Select value={reminderIntervalMinutes} onChange={(e) => setReminderIntervalMinutes(Number(e.target.value))}>
+                {REMINDER_INTERVAL_MINUTES_OPTIONS.map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {formatReminderInterval(minutes)}
                   </option>
                 ))}
               </Select>

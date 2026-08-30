@@ -1,7 +1,9 @@
 import { IsBoolean, IsDateString, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import type { DailyHours } from '../goal.entity';
 
-export const REMINDER_INTERVAL_HOURS_OPTIONS = [2, 4, 6, 12, 24];
+// Values are minutes. Sub-hour options exist to let a user verify the
+// reminder pipeline actually works without waiting hours for the first send.
+export const REMINDER_INTERVAL_MINUTES_OPTIONS = [5, 10, 30, 60, 120, 240, 360, 720, 1440];
 
 export class CreateGoalDto {
   @IsString()
@@ -23,6 +25,6 @@ export class CreateGoalDto {
   reminderEnabled?: boolean;
 
   @IsOptional()
-  @IsIn(REMINDER_INTERVAL_HOURS_OPTIONS, { message: `reminderIntervalHours must be one of: ${REMINDER_INTERVAL_HOURS_OPTIONS.join(', ')}` })
-  reminderIntervalHours?: number;
+  @IsIn(REMINDER_INTERVAL_MINUTES_OPTIONS, { message: `reminderIntervalMinutes must be one of: ${REMINDER_INTERVAL_MINUTES_OPTIONS.join(', ')}` })
+  reminderIntervalMinutes?: number;
 }

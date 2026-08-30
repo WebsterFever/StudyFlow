@@ -46,8 +46,8 @@ export class StudyGoal {
   @Column({ type: 'boolean', default: false })
   reminderEnabled: boolean;
 
-  @Column({ type: 'int', default: 2 })
-  reminderIntervalHours: number;
+  @Column({ type: 'int', default: 120 })
+  reminderIntervalMinutes: number;
 
   // Null until the first reminder email is sent for this goal.
   @Column({ type: 'timestamptz', nullable: true })

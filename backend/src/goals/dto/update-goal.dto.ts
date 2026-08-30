@@ -5,7 +5,7 @@ import type { GoalStatus } from '../goal.entity';
 
 export const GOAL_STATUSES: GoalStatus[] = ['active', 'completed', 'paused'];
 
-// reminderEnabled / reminderIntervalHours are inherited (as optional) from
+// reminderEnabled / reminderIntervalMinutes are inherited (as optional) from
 // CreateGoalDto via PartialType — only `status` is unique to updates.
 export class UpdateGoalDto extends PartialType(CreateGoalDto) {
   @IsOptional()

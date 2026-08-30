@@ -48,8 +48,10 @@ export type GoalStatus = 'active' | 'completed' | 'paused'
 
 export const GOAL_STATUSES: GoalStatus[] = ['active', 'completed', 'paused']
 
-export const REMINDER_INTERVAL_HOURS_OPTIONS = [2, 4, 6, 12, 24] as const
-export type ReminderIntervalHours = (typeof REMINDER_INTERVAL_HOURS_OPTIONS)[number]
+// Values are minutes. Sub-hour options exist so a user can verify the
+// reminder pipeline actually works without waiting hours for the first send.
+export const REMINDER_INTERVAL_MINUTES_OPTIONS = [5, 10, 30, 60, 120, 240, 360, 720, 1440] as const
+export type ReminderIntervalMinutes = (typeof REMINDER_INTERVAL_MINUTES_OPTIONS)[number]
 
 export interface StudyGoal {
   id: string
@@ -59,7 +61,7 @@ export interface StudyGoal {
   dailyHours: DailyHours
   status: GoalStatus
   reminderEnabled: boolean
-  reminderIntervalHours: number
+  reminderIntervalMinutes: number
   lastReminderSentAt: string | null // ISO datetime
 }
 
@@ -73,7 +75,7 @@ export interface GoalInput {
 
 export interface ReminderSettings {
   reminderEnabled: boolean
-  reminderIntervalHours: number
+  reminderIntervalMinutes: number
 }
 
 export interface StudyItem {

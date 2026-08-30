@@ -104,7 +104,7 @@ export class RemindersService {
 
   private isDue(goal: StudyGoal, nowMs: number): boolean {
     if (!goal.lastReminderSentAt) return true;
-    const intervalMs = goal.reminderIntervalHours * 60 * 60 * 1000;
+    const intervalMs = goal.reminderIntervalMinutes * 60 * 1000;
     return nowMs - new Date(goal.lastReminderSentAt).getTime() >= intervalMs;
   }
 
