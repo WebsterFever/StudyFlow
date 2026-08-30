@@ -11,13 +11,15 @@ import { currentMinutesInTimezone, formatFriendlyDate, isWithinQuietHours, parse
 
 export interface ReminderRunSummary {
   processed: number;
+  due: number;
+  usersEmailed: number;
   sent: number;
   skipped: number;
   failed: number;
   details: {
     skippedNotDue: number;
     skippedQuietHours: number;
-    usersEmailed: number;
+    lostClaimRace: number;
   };
 }
 
@@ -37,10 +39,12 @@ export class RemindersService {
 
     if (!this.emailService.isConfigured()) {
       this.logger.warn('Reminder job skipped entirely — AWS SES is not configured.');
-      return { processed: 0, sent: 0, skipped: 0, failed: 0, details: { skippedNotDue: 0, skippedQuietHours: 0, usersEmailed: 0 } };
+      return { processed: 0, due: 0, usersEmailed: 0, sent: 0, skipped: 0, failed: 0, details: { skippedNotDue: 0, skippedQuietHours: 0, lostClaimRace: 0 } };
     }
 
-    // Only goals that are still active and opted in are candidates at all.
+    // Only goals that are still active, opted in, and not paused/completed are
+    // candidates at all — a goal's current Postgres status is always the source
+    // of truth, never a value cached from an earlier run.
     const candidates = await this.goalsRepository.find({
       where: { status: 'active', reminderEnabled: true },
       relations: { user: true },
@@ -66,40 +70,62 @@ export class RemindersService {
     let sent = 0;
     let failed = 0;
     let skippedQuietHours = 0;
+    let lostClaimRace = 0;
     let usersEmailed = 0;
 
     for (const { user, goals } of byUser.values()) {
       if (this.isUserInQuietHours(user)) {
+        // Deliberately do not claim/update lastReminderSentAt here — leaving it
+        // untouched means the very next (non-quiet-hours) run sees the same
+        // goal as still due, with no separate deferred-send bookkeeping needed.
         skippedQuietHours += goals.length;
         continue;
       }
 
+      // Atomically claim each due goal before sending. The scheduler runs every
+      // 5 minutes and a Lambda/EventBridge retry can overlap a prior run — this
+      // conditional UPDATE ensures only one concurrent run can ever win a given
+      // goal, so the same reminder can never be sent twice for one due window.
+      const claimedAt = new Date();
+      const claimed: StudyGoal[] = [];
+      for (const goal of goals) {
+        const won = await this.claimGoal(goal, claimedAt);
+        if (won) claimed.push(goal);
+        else lostClaimRace++;
+      }
+      if (claimed.length === 0) continue;
+
       try {
-        const summaries = await Promise.all(goals.map((goal) => this.buildGoalSummary(goal, user.timezone)));
+        const summaries = await Promise.all(claimed.map((goal) => this.buildGoalSummary(goal, user.timezone)));
         const content = buildReminderEmail(user.name, summaries);
         await this.emailService.sendHtmlEmail(user.email, content.subject, content.html, content.text);
 
-        // Only mark goals as reminded if the send actually succeeded, and only if
-        // nothing else changed lastReminderSentAt since we read it (avoids a lost
-        // update if two job runs somehow overlap).
-        const sentAt = new Date();
-        await Promise.all(goals.map((goal) => this.markReminded(goal, sentAt)));
-
-        sent += goals.length;
+        sent += claimed.length;
         usersEmailed += 1;
-        this.logger.log(`Reminder email sent to 1 user for ${goals.length} goal(s)`);
+        this.logger.log(`Reminder email sent to 1 user for ${claimed.length} goal(s)`);
       } catch (err) {
-        failed += goals.length;
+        // Send failed — release the claim so the next run picks these goals
+        // back up instead of silently losing a reminder.
+        await Promise.all(claimed.map((goal) => this.revertClaim(goal, claimedAt)));
+        failed += claimed.length;
         this.logger.error(`Reminder email failed for 1 user: ${err instanceof Error ? err.message : 'unknown error'}`);
       }
     }
 
-    const skipped = skippedNotDue + skippedQuietHours;
+    const skipped = skippedNotDue + skippedQuietHours + lostClaimRace;
     this.logger.log(
-      `Reminder job finished — ${candidates.length} eligible, ${sent} sent, ${skipped} skipped (${skippedNotDue} not due, ${skippedQuietHours} quiet hours), ${failed} failed, ${usersEmailed} users emailed`,
+      `Reminder job finished — ${candidates.length} processed, ${due.length} due, ${sent} sent, ${skipped} skipped (${skippedNotDue} not due, ${skippedQuietHours} quiet hours, ${lostClaimRace} lost claim race), ${failed} failed, ${usersEmailed} users emailed`,
     );
 
-    return { processed: candidates.length, sent, skipped, failed, details: { skippedNotDue, skippedQuietHours, usersEmailed } };
+    return {
+      processed: candidates.length,
+      due: due.length,
+      usersEmailed,
+      sent,
+      skipped,
+      failed,
+      details: { skippedNotDue, skippedQuietHours, lostClaimRace },
+    };
   }
 
   private isDue(goal: StudyGoal, nowMs: number): boolean {
@@ -117,15 +143,39 @@ export class RemindersService {
     return isWithinQuietHours(nowMinutes, start, end);
   }
 
-  /** Conditional update: only succeeds if lastReminderSentAt still matches what we read before sending. */
-  private async markReminded(goal: StudyGoal, sentAt: Date): Promise<void> {
-    const qb = this.goalsRepository.createQueryBuilder().update(StudyGoal).set({ lastReminderSentAt: sentAt }).where('id = :id', { id: goal.id });
+  /**
+   * Conditional UPDATE: only succeeds (affected row > 0) if the goal is still
+   * active + reminder-enabled and lastReminderSentAt still matches what we
+   * read before attempting the claim. This is the atomic reservation step —
+   * whichever concurrent run's UPDATE actually matches the WHERE clause first
+   * wins the row; every other run gets 0 affected rows and backs off.
+   */
+  private async claimGoal(goal: StudyGoal, claimedAt: Date): Promise<boolean> {
+    const qb = this.goalsRepository
+      .createQueryBuilder()
+      .update(StudyGoal)
+      .set({ lastReminderSentAt: claimedAt })
+      .where('id = :id', { id: goal.id })
+      .andWhere('status = :status', { status: 'active' })
+      .andWhere('"reminderEnabled" = true');
     if (goal.lastReminderSentAt) {
       qb.andWhere('"lastReminderSentAt" = :prev', { prev: goal.lastReminderSentAt });
     } else {
       qb.andWhere('"lastReminderSentAt" IS NULL');
     }
-    await qb.execute();
+    const result = await qb.execute();
+    return (result.affected ?? 0) > 0;
+  }
+
+  /** Releases a claim after a failed send, restoring the value the claim overwrote. */
+  private async revertClaim(goal: StudyGoal, claimedAt: Date): Promise<void> {
+    await this.goalsRepository
+      .createQueryBuilder()
+      .update(StudyGoal)
+      .set({ lastReminderSentAt: goal.lastReminderSentAt })
+      .where('id = :id', { id: goal.id })
+      .andWhere('"lastReminderSentAt" = :claimedAt', { claimedAt })
+      .execute();
   }
 
   private async buildGoalSummary(goal: StudyGoal, timezone: string): Promise<GoalReminderSummary> {

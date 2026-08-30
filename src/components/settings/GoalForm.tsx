@@ -132,6 +132,12 @@ export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps)
             Last reminder: <span className="font-medium text-slate-700 dark:text-slate-300">{lastReminderLabel}</span>
           </p>
         )}
+
+        {reminderEnabled && (
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            Reminders continue automatically while this goal is active.
+          </p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2">
