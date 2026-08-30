@@ -1,29 +1,55 @@
 # AWS Email Reminders — Deployment Runbook
 
-The code is fully built and already deployed to Railway. What's left requires
-your AWS account and a click on a verification email — neither of which I can
-do for you. Follow this top to bottom and reminders will start working.
+SES sending, the backend, and the frontend are fully built, deployed, and
+verified working (see the reference section at the bottom — real test emails
+have been sent and received). The only piece left is creating the Lambda and
+EventBridge schedule that call the backend automatically, on a timer, forever
+— that requires IAM/Lambda/Scheduler permissions I don't have with the
+credentials available to me (only a locked-down SES-send-only user), and it
+needs your AWS account either way. Follow steps 4-5 below and reminders start
+firing on their own, with no browser, computer, or manual trigger needed.
 
-**Architecture** (for reference):
+**Architecture:**
 
 ```
-EventBridge Scheduler (rate(2 hours), ONE schedule)
+EventBridge Scheduler (rate(5 minutes), ONE schedule for every user/goal)
   → Lambda "studyflow-reminder-trigger" (aws/reminder-trigger/index.mjs, thin, no business logic)
     → POST https://backend-production-d3c5.up.railway.app/internal/reminders/process
       (Authorization: Bearer REMINDER_JOB_SECRET)
-      → NestJS backend queries Postgres, decides who's due, calls AWS SES
-        → updates lastReminderSentAt only on a successful send
+      → NestJS backend queries Postgres, decides which goals are actually due
+        (each goal's own reminderIntervalMinutes — 5/10/15/30/60/120/240/360/720/1440 —
+        is compared against lastReminderSentAt; the 5-minute scheduler tick is just
+        how often the check happens, not how often any single goal gets emailed)
+        → atomically claims each due goal, calls AWS SES, updates lastReminderSentAt
+          only on a successful send (claim is released if the send fails)
 ```
 
-Estimated time: 20-30 minutes. Requires the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-configured with an account that has IAM/SES/Lambda/EventBridge permissions
-(your main account login is fine for *running these setup commands* — the
-resources you create will each get their own minimal-privilege role).
+Why 5 minutes and not 2 hours: the shared scheduler must run at least as
+often as the *shortest* interval a user can pick (5 minutes), otherwise a
+goal configured for "every 5 minutes" would never actually get checked that
+often. The backend — not the scheduler — decides who's actually due on every
+tick, so a goal set to "every 2 hours" still only gets emailed roughly every
+2 hours even though the scheduler itself ticks every 5 minutes.
+
+Estimated time: 15-20 minutes. Requires the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+configured with an account that has IAM/Lambda/EventBridge Scheduler
+permissions (your main account login is fine for *running these setup
+commands* — the resources you create will each get their own
+minimal-privilege role, same as the SES-sender user already in place).
 
 Replace `REGION` (e.g. `us-east-1`) and `ACCOUNT_ID` (12-digit, from
 `aws sts get-caller-identity`) everywhere below.
 
 ---
+
+## Already done (steps 1-3 — skip unless starting fresh)
+
+SES sending is verified and live: `webster.fievre@al.infnet.edu.br` is the
+confirmed sender identity, `SES_FROM_EMAIL`/`AWS_ACCESS_KEY_ID`/
+`AWS_SECRET_ACCESS_KEY`/`AWS_REGION` are all set on Railway, and real test
+emails have been sent and received. Steps 1-3 are left below only as
+reference / for setting this up in a fresh AWS account. **Jump straight to
+step 4** to finish the remaining automatic-scheduling piece.
 
 ## 1. Verify a sending identity in SES
 
@@ -191,7 +217,7 @@ when this was curl-tested directly against the backend.
 ## 5. Create the EventBridge schedule (exactly one, for all users)
 
 This is the piece that must NOT be duplicated per goal or per user — one
-schedule, calling one Lambda, every 2 hours, forever.
+schedule, calling one Lambda, every 5 minutes, forever.
 
 ```bash
 aws iam create-role \
@@ -209,48 +235,71 @@ aws iam put-role-policy \
 
 aws scheduler create-schedule \
   --name studyflow-reminder-schedule \
-  --schedule-expression "rate(2 hours)" \
+  --schedule-expression "rate(5 minutes)" \
   --flexible-time-window '{"Mode":"OFF"}' \
   --target "{\"Arn\":\"arn:aws:lambda:REGION:ACCOUNT_ID:function:studyflow-reminder-trigger\",\"RoleArn\":\"arn:aws:iam::ACCOUNT_ID:role/studyflow-reminder-scheduler-role\"}" \
   --region REGION
 ```
 
-This fires every 2 hours regardless of any individual goal's chosen interval
-(2/4/6/12/24h) — the backend's `isDue()` check (comparing `lastReminderSentAt`
-against each goal's own `reminderIntervalHours`) is what actually decides
-who gets emailed on any given run. A 2-hour tick is the finest granularity
-any goal can be configured for, so this cadence is sufficient for every
-interval option.
+This fires every 5 minutes regardless of any individual goal's chosen
+interval (5/10/15/30/60/120/240/360/720/1440 minutes) — the backend's
+`isDue()` check (comparing `lastReminderSentAt` against each goal's own
+`reminderIntervalMinutes`) is what actually decides who gets emailed on any
+given tick. A 5-minute schedule is the finest granularity any goal can be
+configured for, so this cadence is sufficient for every interval option —
+a goal set to "every 2 hours" will still only be emailed roughly every 2
+hours, just checked (and found not-due) every 5 minutes in between.
+
+Once created, confirm it's live:
+
+```bash
+aws scheduler get-schedule --name studyflow-reminder-schedule --region REGION
+```
+
+`State` should be `ENABLED`. From this point on, reminders fire completely
+on their own — no browser tab, no running computer, no manual curl.
 
 ---
 
 ## 6. Verify end-to-end
 
 1. Log into StudyFlow, create or edit a goal, turn on "Remind me about this
-   goal" with a short interval (2h) — save.
+   goal" with a short interval (5 or 10 minutes, for fast testing) — save.
 2. In Settings, set your timezone and (optionally) quiet hours.
-3. Manually invoke the Lambda once (`aws lambda invoke ...` as in step 4) —
-   with SES now configured, a real email should land in your inbox (only
-   works today if your account is still sandboxed and you verified your own
-   address as a recipient in step 1b).
-4. Check `railway logs` for the `[RemindersService]` log lines — should show
-   the goal being picked up, an email attempted, and `lastReminderSentAt`
-   updated only if the send succeeded.
-5. Re-invoke the Lambda immediately — the same goal should now be correctly
-   skipped as "not due yet" (log line `skippedNotDue`), since `lastReminderSentAt`
-   was just set and the 2h interval hasn't elapsed.
-6. Mark the goal "completed" from the Goals page — re-invoke — it should no
-   longer appear in the run at all (excluded by the `status: 'active'` filter).
-7. Turn on quiet hours covering the current time in your timezone, re-enable
-   the goal, re-invoke — should be skipped with `skippedQuietHours`, and
-   `lastReminderSentAt` should NOT change (so it's picked up again once quiet
-   hours end).
-8. Create two active, reminder-enabled goals for the same account — invoke —
-   confirm exactly one consolidated email arrives, listing both goals.
+3. Wait up to 5 minutes (one scheduler tick) — a real email should land in
+   your inbox with no manual trigger at all. Don't run the Lambda or curl
+   yourself for this check — the whole point is confirming it happens
+   without you.
+4. Check `railway logs` for `[RemindersService]` lines — should show the
+   goal picked up, an email attempted, and `lastReminderSentAt` updated only
+   on success.
+5. Wait for the next tick before the interval elapses — the same goal should
+   be correctly skipped (`skippedNotDue` in the response/logs), since
+   `lastReminderSentAt` was just set and the interval hasn't passed yet.
+   Then wait until the interval *has* elapsed — it should send again on its
+   own, still with no manual trigger.
+6. Change the interval to something longer (e.g. 2 hours) and save — confirm
+   emails stop arriving every 5 minutes and only resume once the full 2
+   hours has passed, even though the scheduler keeps ticking every 5 minutes
+   underneath.
+7. Mark the goal "completed" from the Goals page — it should stop
+   permanently (excluded by the `status: 'active'` filter on every future
+   tick, forever, not just until the next scheduled email).
+8. Set the goal to "paused" — same result, no emails while paused. Reopen it
+   to "active" — it becomes eligible again based on its interval.
+9. Turn on quiet hours covering the current time in your timezone — a due
+   reminder during that window should be skipped (`skippedQuietHours`), with
+   `lastReminderSentAt` untouched so it sends on the first eligible tick
+   after quiet hours end.
+10. Create two active, reminder-enabled goals with different intervals on
+    the same account — confirm each is evaluated independently, and when
+    both happen to be due on the same tick, exactly one consolidated email
+    arrives listing both.
 
-If step 3 doesn't deliver an email, check `railway logs` for an SES error
-first (most common cause: recipient not verified while still in the sandbox,
-or the `SES_FROM_EMAIL` identity isn't `Success`-verified yet).
+If step 3 doesn't deliver anything after 5-10 minutes, check `railway logs`
+for an SES error, and separately check CloudWatch Logs for the Lambda
+function (`/aws/lambda/studyflow-reminder-trigger`) to confirm EventBridge
+is actually invoking it on schedule.
 
 ---
 
@@ -259,28 +308,40 @@ or the `SES_FROM_EMAIL` identity isn't `Success`-verified yet).
 - **Backend**: `EmailModule`/`EmailService` (SES client), `RemindersModule`
   (`POST /internal/reminders/process`, guarded by `InternalSecretGuard`
   comparing a bearer token against `REMINDER_JOB_SECRET` with a timing-safe
-  check), due/quiet-hours/consolidation logic in `RemindersService`, DB
-  columns added via a TypeORM migration (not `synchronize`) — all deployed
-  and live at `https://backend-production-d3c5.up.railway.app`.
-- **Frontend**: per-goal reminder toggle + interval picker in the goal form,
-  last-reminder-sent display, and a Settings page section for timezone +
-  quiet hours — all deployed.
+  check), minute-granularity due/quiet-hours/consolidation logic in
+  `RemindersService` with atomic per-goal claiming (a conditional UPDATE
+  reserves a goal before sending, so an overlapping Lambda retry or double
+  EventBridge invocation can never send the same reminder twice — a failed
+  send releases the claim so the next tick retries it), DB columns added via
+  TypeORM migrations (not `synchronize`) — all deployed and live at
+  `https://backend-production-d3c5.up.railway.app`.
+- **Frontend**: per-goal reminder toggle + interval picker (5/10/15/30 min,
+  1/2/4/6/12/24 hours) in the goal form, last-reminder-sent display, a note
+  that reminders continue automatically while the goal stays active, and a
+  Settings page section for timezone + quiet hours — all deployed.
 - **Lambda source**: `aws/reminder-trigger/index.mjs` — zero dependencies,
-  just relays to the backend endpoint above.
+  just relays to the backend endpoint above. Doesn't need to change for the
+  5-minute cadence — it's already just a thin relay with no interval logic
+  of its own.
 - **IAM policy templates**: `aws/reminder-trigger/*.json` — referenced by
   the exact commands above.
-- **What I verified live**: the internal endpoint correctly returns 401
-  without/with-wrong `Authorization`, 200 with the right secret; the new
-  `reminderEnabled`/`reminderIntervalHours`/`lastReminderSentAt` /
-  `timezone`/`quietHours*` columns exist and round-trip correctly through the
-  API; a completed goal is correctly excluded from the reminder query even
-  with `reminderEnabled: true`; invalid timezones and invalid interval values
-  are rejected with 400s.
-- **What I could not verify** (needs your AWS setup): an actual SES email
-  being sent and received — the backend currently has no AWS credentials, so
-  `EmailService.isConfigured()` is `false` and `processReminders()` returns
-  early with all-zero counts. That's the correct, safe behavior for an
-  unconfigured environment — not a bug. Steps 1-3 above give it real
-  credentials; step 6 is the actual live verification you'll need to do
-  yourself, since only you can click the SES verification email link and
-  observe your own inbox.
+- **What I verified live**: SES sending works end-to-end — a real reminder
+  email for an actual goal was sent and received from the verified
+  `webster.fievre@al.infnet.edu.br` identity; the atomic-claim rewrite was
+  deployed and confirmed via the live response shape
+  (`{processed, due, usersEmailed, sent, skipped, failed}`); the internal
+  endpoint correctly returns 401 without/with-wrong `Authorization`, 200
+  with the right secret; a completed goal is correctly excluded from the
+  reminder query even with `reminderEnabled: true`; invalid timezones and
+  invalid interval values are rejected with 400s; the original Gmail
+  self-spoofing delivery failure (sending "From" the same `@gmail.com`
+  address as the recipient) was diagnosed and fixed by switching to a
+  separate verified sender identity.
+- **What I could not do** (needs your AWS account, not just credentials I
+  could be handed): create the Lambda function, its execution role, and the
+  EventBridge schedule (steps 4-5) — these require IAM/Lambda/Scheduler
+  write permissions that the SES-sender credential deliberately doesn't
+  have, and reasonably shouldn't. Every manual `curl`/Lambda-invoke test run
+  so far has proven the *logic* is correct; steps 4-5 are what turns that
+  into something that runs by itself, forever, without me or you triggering
+  it.
