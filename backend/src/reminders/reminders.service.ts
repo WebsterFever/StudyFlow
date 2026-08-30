@@ -128,10 +128,19 @@ export class RemindersService {
     };
   }
 
+  // EventBridge's "every 5 minutes" ticks land with a bit of natural jitter
+  // (a tick can fire a second or two before the exact 300.000s mark). Without
+  // slack, a goal whose interval sits close to the scheduler's own cadence
+  // (e.g. a 5-minute goal on a 5-minute scheduler) can miss that borderline
+  // tick and silently wait a full extra cycle. A small grace window absorbs
+  // that jitter without meaningfully affecting longer intervals.
+  private static readonly DUE_GRACE_MS = 60 * 1000;
+
   private isDue(goal: StudyGoal, nowMs: number): boolean {
     if (!goal.lastReminderSentAt) return true;
     const intervalMs = goal.reminderIntervalMinutes * 60 * 1000;
-    return nowMs - new Date(goal.lastReminderSentAt).getTime() >= intervalMs;
+    const elapsedMs = nowMs - new Date(goal.lastReminderSentAt).getTime();
+    return elapsedMs >= intervalMs - RemindersService.DUE_GRACE_MS;
   }
 
   private isUserInQuietHours(user: User): boolean {
