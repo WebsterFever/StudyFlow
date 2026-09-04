@@ -17,7 +17,9 @@ export function MobileNav() {
             }
           >
             <item.icon size={20} />
-            <span className="leading-none">{item.label === 'Study Content' ? 'Content' : item.label === 'Study Plan' ? 'Plan' : item.label}</span>
+            <span className="leading-none">
+              {item.label === 'Study Content' ? 'Content' : item.label === 'Study Plan' ? 'Plan' : item.label === 'Study Notes' ? 'Notes' : item.label}
+            </span>
           </NavLink>
         ))}
       </div>

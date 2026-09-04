@@ -51,3 +51,59 @@ body {
     scrollbar-width: none;
   }
 }
+
+/* Minimal Prism token theme for note code blocks — deliberately kept dark
+   regardless of the app's light/dark mode, matching common code-editor UI
+   convention (e.g. GitHub code blocks stay dark either way). */
+code[class*='language-'] {
+  color: #e2e8f0;
+}
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #64748b;
+}
+.token.punctuation {
+  color: #94a3b8;
+}
+.token.property,
+.token.tag,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #f472b6;
+}
+.token.boolean,
+.token.number {
+  color: #fb923c;
+}
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #86efac;
+}
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #93c5fd;
+}
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #a78bfa;
+}
+.token.function,
+.token.class-name {
+  color: #60a5fa;
+}
+.token.regex,
+.token.important,
+.token.variable {
+  color: #fbbf24;
+}

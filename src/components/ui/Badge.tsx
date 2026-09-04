@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-type Tone = 'slate' | 'green' | 'amber' | 'red' | 'indigo' | 'blue' | 'purple'
+export type Tone = 'slate' | 'green' | 'amber' | 'red' | 'indigo' | 'blue' | 'purple'
 
 const TONE_CLASSES: Record<Tone, string> = {
   slate: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',

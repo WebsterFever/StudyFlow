@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, CheckCircle2, Circle, Layers, Pencil, Plus, Search, Target, Trash2 } from 'lucide-react'
+import { BookOpen, CheckCircle2, Circle, Layers, NotebookPen, Pencil, Plus, Search, Target, Trash2 } from 'lucide-react'
 import { useStudy } from '../hooks/useStudy'
 import type { StudyItem } from '../types'
 import { Card } from '../components/ui/Card'
@@ -11,6 +11,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { ContentFormModal } from '../components/content/ContentFormModal'
 import { BulkAddModal } from '../components/content/BulkAddModal'
+import { ItemNotesModal } from '../components/notes/ItemNotesModal'
 import { formatMinutes } from '../utils/date'
 
 type SortKey = 'order' | 'title' | 'duration' | 'priority' | 'difficulty'
@@ -35,6 +36,7 @@ export default function StudyContent() {
   const [editingItem, setEditingItem] = useState<StudyItem | null>(null)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [deletingItem, setDeletingItem] = useState<StudyItem | null>(null)
+  const [notesItem, setNotesItem] = useState<StudyItem | null>(null)
 
   const courses = useMemo(() => Array.from(new Set(items.map((i) => i.course))).sort(), [items])
   const topics = useMemo(
@@ -273,6 +275,14 @@ export default function StudyContent() {
                     <td className="px-3 py-2.5">
                       <div className="flex justify-end gap-1">
                         <button
+                          onClick={() => setNotesItem(item)}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/40"
+                          aria-label="Notes"
+                          title="Notes"
+                        >
+                          <NotebookPen size={15} />
+                        </button>
+                        <button
                           onClick={() => openEdit(item)}
                           className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
                           aria-label="Edit"
@@ -308,6 +318,9 @@ export default function StudyContent() {
         goalName={activeGoal.name}
       />
       <BulkAddModal open={bulkOpen} onClose={() => setBulkOpen(false)} onAdd={addItems} existingCourses={courses} nextOrder={nextOrder} goalId={activeGoal.id} />
+      {notesItem && (
+        <ItemNotesModal goalId={activeGoal.id} itemId={notesItem.id} itemTitle={notesItem.title} onClose={() => setNotesItem(null)} />
+      )}
       <ConfirmDialog
         open={deletingItem != null}
         title="Delete study item"

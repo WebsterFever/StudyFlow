@@ -153,6 +153,44 @@ export interface ReviewSuggestion {
   dueDates: string[] // ISO yyyy-mm-dd suggested review dates
 }
 
+export type StudyNoteType = 'text' | 'code' | 'important' | 'question' | 'command' | 'resource'
+
+export const STUDY_NOTE_TYPES: StudyNoteType[] = ['text', 'code', 'important', 'question', 'command', 'resource']
+
+export const STUDY_NOTE_TYPE_LABELS: Record<StudyNoteType, string> = {
+  text: 'Text',
+  code: 'Code',
+  important: 'Important',
+  question: 'Question',
+  command: 'Command',
+  resource: 'Resource',
+}
+
+export interface StudyNote {
+  id: string
+  goalId: string
+  studyItemId: string
+  type: StudyNoteType
+  title: string | null
+  content: string | null
+  fileName: string | null
+  codeLanguage: string | null
+  url: string | null
+  sortOrder: number
+  createdAt: string // ISO datetime
+  updatedAt: string // ISO datetime
+}
+
+/** What a note create/edit form collects, before the backend assigns id/sortOrder. */
+export interface StudyNoteInput {
+  type: StudyNoteType
+  title?: string
+  content?: string
+  fileName?: string
+  codeLanguage?: string
+  url?: string
+}
+
 export type DeadlineStatus = 'on-track' | 'at-risk' | 'behind' | 'no-goal'
 
 /**

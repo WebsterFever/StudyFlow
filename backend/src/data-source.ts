@@ -5,6 +5,7 @@ import { StudyGoal } from './goals/goal.entity';
 import { StudyItem } from './study-items/study-item.entity';
 import { StudySession } from './study-sessions/study-session.entity';
 import { DayOverride } from './day-overrides/day-override.entity';
+import { StudyNote } from './study-notes/study-note.entity';
 
 /**
  * Used only by the TypeORM CLI (migration:generate / migration:run / migration:revert).
@@ -15,7 +16,7 @@ export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  entities: [User, StudyGoal, StudyItem, StudySession, DayOverride],
+  entities: [User, StudyGoal, StudyItem, StudySession, DayOverride, StudyNote],
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
 });

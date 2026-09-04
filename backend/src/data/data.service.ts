@@ -5,6 +5,7 @@ import { assertValidGoalPayload } from '../goals/goals.service';
 import { StudyItem } from '../study-items/study-item.entity';
 import { StudySession } from '../study-sessions/study-session.entity';
 import { DayOverride } from '../day-overrides/day-override.entity';
+import { StudyNote } from '../study-notes/study-note.entity';
 import { UsersService } from '../users/users.service';
 import { GoalBundleDto, ImportPayloadDto } from './dto/import-payload.dto';
 
@@ -43,6 +44,7 @@ export class DataService {
     const bundles = normalizeToBundles(payload);
 
     return this.dataSource.transaction(async (manager) => {
+      await manager.delete(StudyNote, { userId });
       await manager.delete(StudySession, { userId });
       await manager.delete(StudyItem, { userId });
       await manager.delete(StudyGoal, { userId });
@@ -134,6 +136,7 @@ export class DataService {
   /** Wipes all study data (every goal) but keeps the user account itself. */
   async wipeAllData(userId: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
+      await manager.delete(StudyNote, { userId });
       await manager.delete(StudySession, { userId });
       await manager.delete(StudyItem, { userId });
       await manager.delete(StudyGoal, { userId });
