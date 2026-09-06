@@ -6,6 +6,7 @@ import { NAV_ITEMS } from './navConfig'
 import { MigrationPrompt } from '../auth/MigrationPrompt'
 import { Button } from '../ui/Button'
 import { useStudy } from '../../hooks/useStudy'
+import { usePlanner } from '../../hooks/usePlanner'
 import { useTheme } from '../../hooks/useTheme'
 import { useTimer } from '../../hooks/useTimer'
 import { formatStopwatch } from '../../utils/date'
@@ -59,8 +60,15 @@ function ActiveTimerBanner() {
 }
 
 function SyncErrorToast() {
-  const { syncError, clearSyncError } = useStudy()
+  const { syncError: studySyncError, clearSyncError: clearStudySyncError } = useStudy()
+  const { syncError: plannerSyncError, clearSyncError: clearPlannerSyncError } = usePlanner()
+  const syncError = studySyncError ?? plannerSyncError
   if (!syncError) return null
+
+  const dismiss = () => {
+    clearStudySyncError()
+    clearPlannerSyncError()
+  }
 
   return (
     <div className="fixed inset-x-0 bottom-16 z-40 flex justify-center px-4 md:bottom-4">
@@ -68,7 +76,7 @@ function SyncErrorToast() {
         <AlertTriangle size={18} className="mt-0.5 shrink-0 text-red-500" />
         <p className="text-sm text-slate-700 dark:text-slate-300">{syncError}</p>
         <button
-          onClick={clearSyncError}
+          onClick={dismiss}
           aria-label="Dismiss"
           className="ml-1 shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
         >
@@ -82,7 +90,10 @@ function SyncErrorToast() {
 export function Layout() {
   const location = useLocation()
   const { theme, toggleTheme } = useTheme()
-  const { isLoading, loadError, retryLoad } = useStudy()
+  const { isLoading: studyLoading, loadError: studyLoadError, retryLoad: retryStudyLoad } = useStudy()
+  const { isLoading: plannerLoading, loadError: plannerLoadError, retryLoad: retryPlannerLoad } = usePlanner()
+  const isLoading = studyLoading || plannerLoading
+  const loadError = studyLoadError ?? plannerLoadError
   const current = NAV_ITEMS.find((i) => (i.end ? location.pathname === i.to : location.pathname.startsWith(i.to)))
   const headerTitle = location.pathname === '/' ? 'GoalFlow' : location.pathname.startsWith('/planner') ? 'PlannerFlow' : (current?.label ?? 'GoalFlow')
 
@@ -91,7 +102,7 @@ export function Layout() {
       <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center gap-3 text-slate-500 dark:text-slate-400">
           <Loader2 size={28} className="animate-spin text-indigo-600" />
-          <p className="text-sm">Loading your study data…</p>
+          <p className="text-sm">Loading your data…</p>
         </div>
       </div>
     )
@@ -102,9 +113,16 @@ export function Layout() {
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
         <div className="flex max-w-sm flex-col items-center gap-3 text-center">
           <WifiOff size={32} className="text-red-500" />
-          <p className="font-semibold text-slate-900 dark:text-slate-100">Couldn't load your study data</p>
+          <p className="font-semibold text-slate-900 dark:text-slate-100">Couldn't load your data</p>
           <p className="text-sm text-slate-500 dark:text-slate-400">{loadError}</p>
-          <Button onClick={retryLoad}>Try again</Button>
+          <Button
+            onClick={() => {
+              retryStudyLoad()
+              retryPlannerLoad()
+            }}
+          >
+            Try again
+          </Button>
         </div>
       </div>
     )

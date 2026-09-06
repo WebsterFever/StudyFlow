@@ -3,10 +3,13 @@ import { Layout } from './components/layout/Layout'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { PublicOnlyRoute } from './components/auth/PublicOnlyRoute'
 import { StudyProvider } from './context/StudyContext'
+import { PlannerProvider } from './context/PlannerContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import GoalFlowHome from './pages/GoalFlowHome'
 import PlannerFlowHome from './pages/PlannerFlowHome'
+import PlannerGoals from './pages/PlannerGoals'
+import PlannerNotes from './pages/PlannerNotes'
 import Dashboard from './pages/Dashboard'
 import Goals from './pages/Goals'
 import Today from './pages/Today'
@@ -31,12 +34,16 @@ function App() {
         <Route
           element={
             <StudyProvider>
-              <Layout />
+              <PlannerProvider>
+                <Layout />
+              </PlannerProvider>
             </StudyProvider>
           }
         >
           <Route path="/" element={<GoalFlowHome />} />
           <Route path="/planner" element={<PlannerFlowHome />} />
+          <Route path="/planner/goals" element={<PlannerGoals />} />
+          <Route path="/planner/notes" element={<PlannerNotes />} />
           <Route path="/student" element={<Dashboard />} />
           <Route path="/student/goals" element={<Goals />} />
           <Route path="/student/today" element={<Today />} />

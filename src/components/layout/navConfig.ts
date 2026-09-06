@@ -33,3 +33,10 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/student/statistics', label: 'Statistics', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
+
+export const PLANNER_NAV_ITEMS: NavItem[] = [
+  { to: '/planner', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/planner/goals', label: 'Goals', icon: Flag },
+  { to: '/planner/notes', label: 'Notes', icon: NotebookPen },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon },
+]

@@ -1,11 +1,14 @@
-import { NavLink } from 'react-router-dom'
-import { NAV_ITEMS } from './navConfig'
+import { NavLink, useLocation } from 'react-router-dom'
+import { NAV_ITEMS, PLANNER_NAV_ITEMS } from './navConfig'
 
 export function MobileNav() {
+  const location = useLocation()
+  const navItems = location.pathname.startsWith('/planner') ? PLANNER_NAV_ITEMS : NAV_ITEMS
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 md:hidden">
       <div className="scrollbar-none flex w-full overflow-x-auto">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

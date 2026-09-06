@@ -11,6 +11,11 @@ import { ProjectFile } from '../project-snapshots/project-file.entity';
 import { Assignment } from '../assignments/assignment.entity';
 import { Exam } from '../exams/exam.entity';
 import { ExamReviewItem } from '../exams/exam-review-item.entity';
+import { PlannerGoal } from '../planner-goals/planner-goal.entity';
+import { PlannerMilestone } from '../planner-milestones/planner-milestone.entity';
+import { PlannerTask } from '../planner-tasks/planner-task.entity';
+import { PlannerSubtask } from '../planner-subtasks/planner-subtask.entity';
+import { PlannerNote } from '../planner-notes/planner-note.entity';
 import { UsersService } from '../users/users.service';
 import { GoalBundleDto, ImportPayloadDto } from './dto/import-payload.dto';
 
@@ -143,7 +148,7 @@ export class DataService {
     return this.replaceAllData(userId, payload);
   }
 
-  /** Wipes all study data (every goal) but keeps the user account itself. */
+  /** Wipes all data (both StudentFlow and PlannerFlow, every goal) but keeps the user account itself. */
   async wipeAllData(userId: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(ExamReviewItem, { userId });
@@ -156,6 +161,11 @@ export class DataService {
       await manager.delete(StudyItem, { userId });
       await manager.delete(StudyGoal, { userId });
       await manager.delete(DayOverride, { userId });
+      await manager.delete(PlannerSubtask, { userId });
+      await manager.delete(PlannerTask, { userId });
+      await manager.delete(PlannerMilestone, { userId });
+      await manager.delete(PlannerNote, { userId });
+      await manager.delete(PlannerGoal, { userId });
     });
   }
 }

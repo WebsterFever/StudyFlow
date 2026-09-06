@@ -11,6 +11,11 @@ import { ProjectFile } from './project-snapshots/project-file.entity';
 import { Assignment } from './assignments/assignment.entity';
 import { Exam } from './exams/exam.entity';
 import { ExamReviewItem } from './exams/exam-review-item.entity';
+import { PlannerGoal } from './planner-goals/planner-goal.entity';
+import { PlannerMilestone } from './planner-milestones/planner-milestone.entity';
+import { PlannerTask } from './planner-tasks/planner-task.entity';
+import { PlannerSubtask } from './planner-subtasks/planner-subtask.entity';
+import { PlannerNote } from './planner-notes/planner-note.entity';
 
 /**
  * Used only by the TypeORM CLI (migration:generate / migration:run / migration:revert).
@@ -21,7 +26,24 @@ export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-  entities: [User, StudyGoal, StudyItem, StudySession, DayOverride, StudyNote, ProjectSnapshot, ProjectFile, Assignment, Exam, ExamReviewItem],
+  entities: [
+    User,
+    StudyGoal,
+    StudyItem,
+    StudySession,
+    DayOverride,
+    StudyNote,
+    ProjectSnapshot,
+    ProjectFile,
+    Assignment,
+    Exam,
+    ExamReviewItem,
+    PlannerGoal,
+    PlannerMilestone,
+    PlannerTask,
+    PlannerSubtask,
+    PlannerNote,
+  ],
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
 });

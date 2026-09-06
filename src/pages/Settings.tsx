@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { AlertCircle, Bell, CheckCircle2, Database, Download, LogOut, Mail, Sparkles, Trash2, Upload, User as UserIcon } from 'lucide-react'
 import { useStudy } from '../hooks/useStudy'
+import { usePlanner } from '../hooks/usePlanner'
 import { useAuth } from '../hooks/useAuth'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -15,6 +16,7 @@ const TIMEZONE_OPTIONS: string[] =
 
 export default function Settings() {
   const { exportData, importData, resetData, loadDemoData } = useStudy()
+  const { resetLocalState: resetPlannerLocalState } = usePlanner()
   const { user, logout, setUserProfile } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -178,7 +180,7 @@ export default function Settings() {
         <CardHeader title="Danger zone" subtitle="This cannot be undone" />
         <div className="flex items-center gap-3 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">
           <Database size={16} />
-          Reset all data — deletes every goal, all content, sessions and history from your account.
+          Reset all data — deletes every goal, task, and note across both StudentFlow and PlannerFlow, plus all content, sessions and history from your account.
         </div>
         <div className="mt-3">
           <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => setConfirmReset(true)}>
@@ -190,11 +192,12 @@ export default function Settings() {
       <ConfirmDialog
         open={confirmReset}
         title="Reset all data?"
-        message="This will permanently delete every goal, all study content, plans and history from your account. This cannot be undone."
+        message="This will permanently delete every goal, task, and note across both StudentFlow and PlannerFlow, plus all study content, plans and history from your account. This cannot be undone."
         confirmLabel="Reset everything"
         danger
         onConfirm={() => {
           resetData()
+          resetPlannerLocalState()
           setConfirmReset(false)
         }}
         onCancel={() => setConfirmReset(false)}

@@ -1,7 +1,8 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { Flame, LogOut, Target } from 'lucide-react'
-import { NAV_ITEMS } from './navConfig'
+import { NAV_ITEMS, PLANNER_NAV_ITEMS } from './navConfig'
 import { GoalSwitcher } from './GoalSwitcher'
+import { PlannerGoalSwitcher } from './PlannerGoalSwitcher'
 import { FlowSwitcher } from './FlowSwitcher'
 import { useStudy } from '../../hooks/useStudy'
 import { useAuth } from '../../hooks/useAuth'
@@ -11,6 +12,9 @@ export function Sidebar() {
   const { state } = useStudy()
   const { user, logout } = useAuth()
   const streak = computeStreak(state.sessions)
+  const location = useLocation()
+  const isPlannerFlow = location.pathname.startsWith('/planner')
+  const navItems = isPlannerFlow ? PLANNER_NAV_ITEMS : NAV_ITEMS
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:flex">
@@ -26,10 +30,10 @@ export function Sidebar() {
 
       <FlowSwitcher className="mx-3 mb-3" />
 
-      <GoalSwitcher />
+      {isPlannerFlow ? <PlannerGoalSwitcher /> : <GoalSwitcher />}
 
       <nav className="flex-1 space-y-1 px-3 py-2">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -48,7 +52,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {streak.currentStreak > 0 && (
+      {!isPlannerFlow && streak.currentStreak > 0 && (
         <div className="mx-3 mb-3 flex items-center gap-2 rounded-xl bg-orange-50 px-3 py-2.5 text-sm font-medium text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
           <Flame size={16} className="fill-orange-500 text-orange-500" />
           {streak.currentStreak}-day streak

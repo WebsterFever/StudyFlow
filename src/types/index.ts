@@ -315,3 +315,127 @@ export interface ExamInput {
   examDate: string
   reminderEnabled?: boolean
 }
+
+// ---- PlannerFlow ----
+
+export type PlannerGoalStatus = 'active' | 'completed' | 'paused'
+
+export const PLANNER_GOAL_STATUSES: PlannerGoalStatus[] = ['active', 'completed', 'paused']
+
+export interface PlannerGoal {
+  id: string
+  userId: string
+  name: string
+  description: string | null
+  deadline: string | null // ISO yyyy-mm-dd
+  status: PlannerGoalStatus
+  priority: Priority
+  reminderEnabled: boolean
+  reminderIntervalMinutes: number
+  lastReminderSentAt: string | null // ISO datetime
+  createdAt: string
+  updatedAt: string
+}
+
+export const PLANNER_REMINDER_INTERVAL_MINUTES_OPTIONS = [60, 120, 240, 360, 720, 1440, 2880, 10080] as const
+
+/** What a planner goal create/edit form collects. */
+export interface PlannerGoalInput {
+  name: string
+  description?: string
+  deadline?: string
+  priority?: Priority
+  reminderEnabled?: boolean
+  reminderIntervalMinutes?: number
+}
+
+export interface PlannerMilestone {
+  id: string
+  userId: string
+  goalId: string
+  title: string
+  dueDate: string | null
+  completed: boolean
+  order: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PlannerMilestoneInput {
+  goalId: string
+  title: string
+  dueDate?: string
+  completed?: boolean
+  order?: number
+}
+
+export type PlannerTaskStatus = 'not_started' | 'in_progress' | 'completed'
+
+export const PLANNER_TASK_STATUSES: PlannerTaskStatus[] = ['not_started', 'in_progress', 'completed']
+
+export const PLANNER_TASK_STATUS_LABELS: Record<PlannerTaskStatus, string> = {
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+}
+
+export interface PlannerTask {
+  id: string
+  userId: string
+  goalId: string
+  milestoneId: string | null
+  title: string
+  dueDate: string | null
+  priority: Priority
+  status: PlannerTaskStatus
+  isRecurring: boolean
+  recurrenceIntervalDays: number | null
+  reminderEnabled: boolean
+  reminderSentAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PlannerTaskInput {
+  goalId: string
+  milestoneId?: string
+  title: string
+  dueDate?: string
+  priority?: Priority
+  status?: PlannerTaskStatus
+  isRecurring?: boolean
+  recurrenceIntervalDays?: number
+  reminderEnabled?: boolean
+}
+
+export interface PlannerSubtask {
+  id: string
+  userId: string
+  taskId: string
+  title: string
+  completed: boolean
+  order: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PlannerSubtaskInput {
+  taskId: string
+  title: string
+  completed?: boolean
+  order?: number
+}
+
+export interface PlannerNote {
+  id: string
+  userId: string
+  goalId: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PlannerNoteInput {
+  goalId: string
+  content: string
+}

@@ -6,12 +6,17 @@ import { StudySession } from '../study-sessions/study-session.entity';
 import { Assignment } from '../assignments/assignment.entity';
 import { Exam } from '../exams/exam.entity';
 import { ExamReviewItem } from '../exams/exam-review-item.entity';
+import { PlannerGoal } from '../planner-goals/planner-goal.entity';
+import { PlannerTask } from '../planner-tasks/planner-task.entity';
 import { EmailModule } from '../email/email.module';
 import { RemindersService } from './reminders.service';
 import { RemindersController } from './reminders.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([StudyGoal, StudyItem, StudySession, Assignment, Exam, ExamReviewItem]), EmailModule],
+  imports: [
+    TypeOrmModule.forFeature([StudyGoal, StudyItem, StudySession, Assignment, Exam, ExamReviewItem, PlannerGoal, PlannerTask]),
+    EmailModule,
+  ],
   providers: [RemindersService],
   controllers: [RemindersController],
 })

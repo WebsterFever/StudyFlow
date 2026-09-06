@@ -12,6 +12,11 @@ import { StudyNotesModule } from './study-notes/study-notes.module';
 import { ProjectSnapshotsModule } from './project-snapshots/project-snapshots.module';
 import { AssignmentsModule } from './assignments/assignments.module';
 import { ExamsModule } from './exams/exams.module';
+import { PlannerGoalsModule } from './planner-goals/planner-goals.module';
+import { PlannerMilestonesModule } from './planner-milestones/planner-milestones.module';
+import { PlannerTasksModule } from './planner-tasks/planner-tasks.module';
+import { PlannerSubtasksModule } from './planner-subtasks/planner-subtasks.module';
+import { PlannerNotesModule } from './planner-notes/planner-notes.module';
 import { DataModule } from './data/data.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { HealthController } from './health.controller';
@@ -43,6 +48,11 @@ import { HealthController } from './health.controller';
     ProjectSnapshotsModule,
     AssignmentsModule,
     ExamsModule,
+    PlannerGoalsModule,
+    PlannerMilestonesModule,
+    PlannerTasksModule,
+    PlannerSubtasksModule,
+    PlannerNotesModule,
     DataModule,
     RemindersModule,
   ],

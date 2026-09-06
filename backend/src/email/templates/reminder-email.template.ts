@@ -26,6 +26,21 @@ export interface ExamReminderSummary {
   progressPercent: number;
 }
 
+export interface PlannerGoalReminderSummary {
+  goalName: string;
+  description: string | null;
+  deadlineLabel: string | null;
+  tasksCompleted: number;
+  tasksTotal: number;
+}
+
+export interface PlannerTaskReminderSummary {
+  goalName: string;
+  title: string;
+  dueDateLabel: string;
+  priority: string;
+}
+
 export interface ReminderEmailContent {
   subject: string;
   html: string;
@@ -143,21 +158,50 @@ function examSectionHtml(e: ExamReminderSummary): string {
     </tr>`;
 }
 
-/** Builds a single-item or consolidated reminder email covering goals, assignments due today, and upcoming exams — however many of each are due at once. */
+function plannerGoalSectionHtml(g: PlannerGoalReminderSummary, showHeading: boolean): string {
+  const progressLine =
+    g.tasksTotal > 0
+      ? `<td style="font-size:13px;color:#64748b;text-align:right;">${g.tasksCompleted} of ${g.tasksTotal} tasks done</td>`
+      : `<td style="font-size:13px;color:#64748b;text-align:right;">No tasks yet</td>`;
+  return `
+    ${showHeading ? `<h2 style="margin:0 0 12px;font-size:16px;color:#0f172a;">${escapeHtml(g.goalName)}</h2>` : ''}
+    <table role="presentation" width="100%">
+      <tr>
+        <td style="font-size:13px;color:#64748b;">Progress</td>
+        ${progressLine}
+      </tr>
+      ${g.deadlineLabel ? `<tr><td style="font-size:13px;color:#64748b;">Deadline</td><td style="font-size:13px;color:#64748b;text-align:right;">${escapeHtml(g.deadlineLabel)}</td></tr>` : ''}
+    </table>
+  `;
+}
+
+function plannerTaskSectionHtml(t: PlannerTaskReminderSummary): string {
+  return `
+    <tr>
+      <td style="padding:8px 0;border-top:1px solid #f1f5f9;color:#0f172a;font-size:14px;">${escapeHtml(t.title)}<br/><span style="color:#94a3b8;font-size:12px;">${escapeHtml(t.goalName)} — ${escapeHtml(t.priority)} priority</span></td>
+      <td style="padding:8px 0;border-top:1px solid #f1f5f9;color:#64748b;font-size:14px;text-align:right;white-space:nowrap;">Due ${escapeHtml(t.dueDateLabel)}</td>
+    </tr>`;
+}
+
+/** Builds a single-item or consolidated reminder email covering StudentFlow goals/assignments/exams and PlannerFlow goals/tasks — however many of each are due at once. */
 export function buildReminderEmail(
   userName: string,
   goals: GoalReminderSummary[],
   assignments: AssignmentReminderSummary[] = [],
   exams: ExamReminderSummary[] = [],
+  plannerGoals: PlannerGoalReminderSummary[] = [],
+  plannerTasks: PlannerTaskReminderSummary[] = [],
 ): ReminderEmailContent {
   const greeting = userName ? `Hi ${userName},` : 'Hi,';
-  const totalCount = goals.length + assignments.length + exams.length;
+  const totalCount = goals.length + assignments.length + exams.length + plannerGoals.length + plannerTasks.length;
 
   let subject: string;
   if (totalCount === 1) {
     if (goals.length === 1) subject = `GoalFlow — ${goals[0].goalName} is still in progress`;
     else if (assignments.length === 1) subject = `GoalFlow — ${assignments[0].title} is due today`;
-    else subject = `GoalFlow — ${exams[0].title} exam is coming up`;
+    else if (exams.length === 1) subject = `GoalFlow — ${exams[0].title} exam is coming up`;
+    else if (plannerGoals.length === 1) subject = `GoalFlow — ${plannerGoals[0].goalName} needs attention`;
+    else subject = `GoalFlow — ${plannerTasks[0].title} is due today`;
   } else {
     subject = `GoalFlow — ${totalCount} items need your attention`;
   }
@@ -176,6 +220,16 @@ export function buildReminderEmail(
         ? goalSectionHtml(goals[0], false)
         : goals.map((g) => `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid #f1f5f9;">${goalSectionHtml(g, true)}</div>`).join('')
       : '';
+  const plannerTasksHtml =
+    plannerTasks.length > 0
+      ? `<h2 style="margin:20px 0 8px;font-size:14px;color:#0f172a;">Planner tasks due today</h2><table role="presentation" width="100%">${plannerTasks.map(plannerTaskSectionHtml).join('')}</table>`
+      : '';
+  const plannerGoalsHtml =
+    plannerGoals.length > 0
+      ? plannerGoals.length === 1
+        ? plannerGoalSectionHtml(plannerGoals[0], plannerGoals.length + goals.length > 0)
+        : plannerGoals.map((g) => `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid #f1f5f9;">${plannerGoalSectionHtml(g, true)}</div>`).join('')
+      : '';
 
   const introText =
     totalCount === 1
@@ -183,7 +237,11 @@ export function buildReminderEmail(
         ? `<strong>${escapeHtml(goals[0].goalName)}</strong> needs your attention — you still have study work remaining.`
         : assignments.length === 1
           ? `<strong>${escapeHtml(assignments[0].title)}</strong> is due today.`
-          : `<strong>${escapeHtml(exams[0].title)}</strong> is coming up.`
+          : exams.length === 1
+            ? `<strong>${escapeHtml(exams[0].title)}</strong> is coming up.`
+            : plannerGoals.length === 1
+              ? `<strong>${escapeHtml(plannerGoals[0].goalName)}</strong> needs your attention.`
+              : `<strong>${escapeHtml(plannerTasks[0].title)}</strong> is due today.`
       : `<strong>${totalCount} items</strong> need your attention.`;
 
   const html = `${WRAPPER_OPEN}
@@ -192,6 +250,8 @@ export function buildReminderEmail(
     ${goalsHtml}
     ${assignmentsHtml}
     ${examsHtml}
+    ${plannerGoalsHtml}
+    ${plannerTasksHtml}
     <p style="margin:24px 0 0;color:#334155;font-size:14px;">Keep going — completing today's work will keep you on track.</p>
     ${WRAPPER_CLOSE}`;
 
@@ -204,6 +264,17 @@ export function buildReminderEmail(
   if (exams.length > 0) {
     textParts.push('Exams coming up:');
     for (const e of exams) textParts.push(`  - ${e.title} (${e.goalName}) — ${e.examDateLabel}, ${e.progressPercent}% reviewed`);
+  }
+  if (plannerGoals.length > 0) {
+    textParts.push('Planner goals:');
+    for (const g of plannerGoals) {
+      const progress = g.tasksTotal > 0 ? `${g.tasksCompleted} of ${g.tasksTotal} tasks done` : 'no tasks yet';
+      textParts.push(`  - ${g.goalName} — ${progress}${g.deadlineLabel ? `, deadline ${g.deadlineLabel}` : ''}`);
+    }
+  }
+  if (plannerTasks.length > 0) {
+    textParts.push('Planner tasks due today:');
+    for (const t of plannerTasks) textParts.push(`  - ${t.title} (${t.goalName}) — due ${t.dueDateLabel}, ${t.priority} priority`);
   }
   textParts.push('', "Keep going — completing today's work will keep you on track.");
   const text = textParts.join('\n');
