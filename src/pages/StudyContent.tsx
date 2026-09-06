@@ -319,7 +319,7 @@ export default function StudyContent() {
       />
       <BulkAddModal open={bulkOpen} onClose={() => setBulkOpen(false)} onAdd={addItems} existingCourses={courses} nextOrder={nextOrder} goalId={activeGoal.id} />
       {notesItem && (
-        <ItemNotesModal goalId={activeGoal.id} itemId={notesItem.id} itemTitle={notesItem.title} onClose={() => setNotesItem(null)} />
+        <ItemNotesModal goalId={activeGoal.id} itemId={notesItem.id} itemTitle={notesItem.title} learningType={activeGoal.learningType} onClose={() => setNotesItem(null)} />
       )}
       <ConfirmDialog
         open={deletingItem != null}

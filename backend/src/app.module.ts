@@ -10,6 +10,8 @@ import { StudySessionsModule } from './study-sessions/study-sessions.module';
 import { DayOverridesModule } from './day-overrides/day-overrides.module';
 import { StudyNotesModule } from './study-notes/study-notes.module';
 import { ProjectSnapshotsModule } from './project-snapshots/project-snapshots.module';
+import { AssignmentsModule } from './assignments/assignments.module';
+import { ExamsModule } from './exams/exams.module';
 import { DataModule } from './data/data.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { HealthController } from './health.controller';
@@ -39,6 +41,8 @@ import { HealthController } from './health.controller';
     DayOverridesModule,
     StudyNotesModule,
     ProjectSnapshotsModule,
+    AssignmentsModule,
+    ExamsModule,
     DataModule,
     RemindersModule,
   ],

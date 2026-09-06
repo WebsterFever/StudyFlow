@@ -87,6 +87,7 @@ export class GoalsService {
       startDate: source.startDate,
       deadline: source.deadline,
       dailyHours: source.dailyHours,
+      learningType: source.learningType,
       status: 'active',
     });
     const saved = await this.goalsRepository.save(clone);

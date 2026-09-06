@@ -83,6 +83,7 @@ export function buildDemoItems(goalId: string): StudyItem[] {
 export function buildDemoGoal(): GoalInput {
   return {
     name: 'Master Frontend Development',
+    learningType: 'programming_technology',
     startDate: todayISO(),
     deadline: addDays(todayISO(), 42),
     dailyHours: {

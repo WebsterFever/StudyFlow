@@ -7,13 +7,27 @@ import { DayOverride } from '../day-overrides/day-override.entity';
 import { StudyNote } from '../study-notes/study-note.entity';
 import { ProjectSnapshot } from '../project-snapshots/project-snapshot.entity';
 import { ProjectFile } from '../project-snapshots/project-file.entity';
+import { Assignment } from '../assignments/assignment.entity';
+import { Exam } from '../exams/exam.entity';
+import { ExamReviewItem } from '../exams/exam-review-item.entity';
 import { UsersModule } from '../users/users.module';
 import { DataService } from './data.service';
 import { DataController } from './data.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StudyGoal, StudyItem, StudySession, DayOverride, StudyNote, ProjectSnapshot, ProjectFile]),
+    TypeOrmModule.forFeature([
+      StudyGoal,
+      StudyItem,
+      StudySession,
+      DayOverride,
+      StudyNote,
+      ProjectSnapshot,
+      ProjectFile,
+      Assignment,
+      Exam,
+      ExamReviewItem,
+    ]),
     UsersModule,
   ],
   providers: [DataService],

@@ -5,6 +5,7 @@ import { useStudy } from '../hooks/useStudy'
 import { StatCard } from '../components/dashboard/StatCard'
 import { DeadlineStatusBanner } from '../components/dashboard/DeadlineStatusBanner'
 import { GoalsOverviewList } from '../components/dashboard/GoalsOverviewList'
+import { UpcomingDeadlines } from '../components/dashboard/UpcomingDeadlines'
 import { SessionListItem } from '../components/session/SessionListItem'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -62,6 +63,7 @@ export default function Dashboard() {
     return (
       <div className="space-y-6">
         <GoalHeader goal={activeGoal} daysLeft={daysRemaining(activeGoal, today)} />
+        <UpcomingDeadlines goalId={activeGoal.id} />
         {state.goals.length > 1 && <GoalsOverviewList />}
         <EmptyState
           icon={<BookOpen size={40} />}
@@ -82,6 +84,8 @@ export default function Dashboard() {
       <GoalHeader goal={activeGoal} daysLeft={daysRemaining(activeGoal, today)} />
 
       <DeadlineStatusBanner achievability={achievability} />
+
+      <UpcomingDeadlines goalId={activeGoal.id} />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard icon={<TrendingUp size={20} />} label="Overall progress" value={`${progress.percent}%`} sub={`${progress.completed} / ${progress.total} lessons`} />

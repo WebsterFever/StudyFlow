@@ -53,6 +53,35 @@ export const GOAL_STATUSES: GoalStatus[] = ['active', 'completed', 'paused']
 export const REMINDER_INTERVAL_MINUTES_OPTIONS = [5, 10, 15, 30, 60, 120, 240, 360, 720, 1440] as const
 export type ReminderIntervalMinutes = (typeof REMINDER_INTERVAL_MINUTES_OPTIONS)[number]
 
+export type LearningType =
+  | 'school_subject'
+  | 'college_course'
+  | 'programming_technology'
+  | 'language'
+  | 'certification'
+  | 'online_course'
+  | 'other'
+
+export const LEARNING_TYPES: LearningType[] = [
+  'school_subject',
+  'college_course',
+  'programming_technology',
+  'language',
+  'certification',
+  'online_course',
+  'other',
+]
+
+export const LEARNING_TYPE_LABELS: Record<LearningType, string> = {
+  school_subject: 'School Subject',
+  college_course: 'College Course',
+  programming_technology: 'Programming / Technology',
+  language: 'Language',
+  certification: 'Certification',
+  online_course: 'Online Course',
+  other: 'Other',
+}
+
 export interface StudyGoal {
   id: string
   name: string
@@ -60,6 +89,7 @@ export interface StudyGoal {
   deadline: string // ISO yyyy-mm-dd
   dailyHours: DailyHours
   status: GoalStatus
+  learningType: LearningType
   reminderEnabled: boolean
   reminderIntervalMinutes: number
   lastReminderSentAt: string | null // ISO datetime
@@ -71,6 +101,7 @@ export interface GoalInput {
   startDate: string
   deadline: string
   dailyHours: DailyHours
+  learningType: LearningType
 }
 
 export interface ReminderSettings {
@@ -227,4 +258,60 @@ export interface AppState {
   sessions: StudySession[]
   dayOverrides: DayOverride[]
   activeTimer: ActiveTimer | null
+}
+
+export type AssignmentStatus = 'not_started' | 'in_progress' | 'completed'
+
+export const ASSIGNMENT_STATUSES: AssignmentStatus[] = ['not_started', 'in_progress', 'completed']
+
+export const ASSIGNMENT_STATUS_LABELS: Record<AssignmentStatus, string> = {
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+}
+
+export interface Assignment {
+  id: string
+  userId: string
+  goalId: string
+  title: string
+  dueDate: string // ISO yyyy-mm-dd
+  status: AssignmentStatus
+  priority: Priority
+  reminderEnabled: boolean
+  reminderSentAt: string | null // ISO datetime
+  createdAt: string
+  updatedAt: string
+}
+
+/** What an assignment create/edit form collects. */
+export interface AssignmentInput {
+  goalId: string
+  title: string
+  dueDate: string
+  status?: AssignmentStatus
+  priority?: Priority
+  reminderEnabled?: boolean
+}
+
+export interface Exam {
+  id: string
+  userId: string
+  goalId: string
+  title: string
+  examDate: string // ISO yyyy-mm-dd
+  reminderEnabled: boolean
+  reminderSentAt: string | null // ISO datetime
+  createdAt: string
+  updatedAt: string
+  reviewItemIds: string[]
+  progressPercent: number
+}
+
+/** What an exam create/edit form collects. */
+export interface ExamInput {
+  goalId: string
+  title: string
+  examDate: string
+  reminderEnabled?: boolean
 }

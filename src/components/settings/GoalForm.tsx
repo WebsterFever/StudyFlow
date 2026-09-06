@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Save } from 'lucide-react'
-import type { DailyHours, GoalInput, ReminderSettings, StudyGoal } from '../../types'
+import type { DailyHours, GoalInput, LearningType, ReminderSettings, StudyGoal } from '../../types'
 import { DAYS_OF_WEEK, REMINDER_INTERVAL_MINUTES_OPTIONS } from '../../types'
 import { Field, Input, Select } from '../ui/Form'
 import { Button } from '../ui/Button'
 import { weekdayLabel } from '../../utils/date'
 import { makeDefaultDailyHours } from '../../services/storage'
+import { LearningTypePicker } from './LearningTypePicker'
 
 interface GoalFormProps {
   goal?: StudyGoal | null
@@ -31,6 +32,7 @@ function formatLastReminder(iso: string | null): string | null {
 
 export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps) {
   const [name, setName] = useState(goal?.name ?? '')
+  const [learningType, setLearningType] = useState<LearningType>(goal?.learningType ?? 'programming_technology')
   const [startDate, setStartDate] = useState(goal?.startDate ?? '')
   const [deadline, setDeadline] = useState(goal?.deadline ?? '')
   const [dailyHours, setDailyHours] = useState<DailyHours>(goal?.dailyHours ?? makeDefaultDailyHours(2))
@@ -57,7 +59,7 @@ export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps)
       return
     }
     setErrors({})
-    onSave({ name: name.trim(), startDate, deadline, dailyHours, reminderEnabled, reminderIntervalMinutes })
+    onSave({ name: name.trim(), learningType, startDate, deadline, dailyHours, reminderEnabled, reminderIntervalMinutes })
   }
 
   const lastReminderLabel = formatLastReminder(goal?.lastReminderSentAt ?? null)
@@ -73,6 +75,8 @@ export function GoalForm({ goal, onSave, onCancel, submitLabel }: GoalFormProps)
           autoFocus
         />
       </Field>
+
+      <LearningTypePicker value={learningType} onChange={setLearningType} />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Start date" required error={errors.startDate}>

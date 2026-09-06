@@ -12,6 +12,8 @@ import Goals from './pages/Goals'
 import Today from './pages/Today'
 import StudyPlan from './pages/StudyPlan'
 import StudyContent from './pages/StudyContent'
+import Assignments from './pages/Assignments'
+import Exams from './pages/Exams'
 import StudyNotes from './pages/StudyNotes'
 import Progress from './pages/Progress'
 import Statistics from './pages/Statistics'
@@ -40,6 +42,8 @@ function App() {
           <Route path="/student/today" element={<Today />} />
           <Route path="/student/plan" element={<StudyPlan />} />
           <Route path="/student/content" element={<StudyContent />} />
+          <Route path="/student/assignments" element={<Assignments />} />
+          <Route path="/student/exams" element={<Exams />} />
           <Route path="/student/notes" element={<StudyNotes />} />
           <Route path="/student/progress" element={<Progress />} />
           <Route path="/student/statistics" element={<Statistics />} />

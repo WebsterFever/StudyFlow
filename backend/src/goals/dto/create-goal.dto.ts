@@ -1,5 +1,6 @@
 import { IsBoolean, IsDateString, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import type { DailyHours } from '../goal.entity';
+import { LEARNING_TYPES, type LearningType } from '../goal.entity';
 
 // Values are minutes. Sub-hour options exist to let a user verify the
 // reminder pipeline actually works without waiting hours for the first send.
@@ -10,6 +11,10 @@ export class CreateGoalDto {
   @MinLength(1, { message: 'Goal name cannot be empty.' })
   @MaxLength(255)
   name: string;
+
+  @IsOptional()
+  @IsIn(LEARNING_TYPES, { message: `learningType must be one of: ${LEARNING_TYPES.join(', ')}` })
+  learningType?: LearningType;
 
   @IsDateString({}, { message: 'Start date must be a valid date.' })
   startDate: string;

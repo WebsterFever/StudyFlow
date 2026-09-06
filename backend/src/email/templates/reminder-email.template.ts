@@ -13,6 +13,19 @@ export interface GoalReminderSummary {
   remainingSessions: RemainingSessionSummary[];
 }
 
+export interface AssignmentReminderSummary {
+  goalName: string;
+  title: string;
+  dueDateLabel: string;
+}
+
+export interface ExamReminderSummary {
+  goalName: string;
+  title: string;
+  examDateLabel: string;
+  progressPercent: number;
+}
+
 export interface ReminderEmailContent {
   subject: string;
   html: string;
@@ -114,30 +127,86 @@ function goalSectionText(goal: GoalReminderSummary): string {
   return lines.join('\n');
 }
 
-/** Builds a single-goal or consolidated multi-goal reminder email, depending on how many goals are due at once. */
-export function buildReminderEmail(userName: string, goals: GoalReminderSummary[]): ReminderEmailContent {
-  const greeting = userName ? `Hi ${userName},` : 'Hi,';
+function assignmentSectionHtml(a: AssignmentReminderSummary): string {
+  return `
+    <tr>
+      <td style="padding:8px 0;border-top:1px solid #f1f5f9;color:#0f172a;font-size:14px;">${escapeHtml(a.title)}<br/><span style="color:#94a3b8;font-size:12px;">${escapeHtml(a.goalName)}</span></td>
+      <td style="padding:8px 0;border-top:1px solid #f1f5f9;color:#64748b;font-size:14px;text-align:right;white-space:nowrap;">Due ${escapeHtml(a.dueDateLabel)}</td>
+    </tr>`;
+}
 
-  if (goals.length === 1) {
-    const goal = goals[0];
-    const subject = `GoalFlow — ${goal.goalName} is still in progress`;
-    const html = `${WRAPPER_OPEN}
-      <p style="margin:0 0 4px;color:#0f172a;font-size:15px;">${greeting}</p>
-      <p style="margin:0 0 20px;color:#0f172a;font-size:15px;"><strong>${escapeHtml(goal.goalName)}</strong> needs your attention — you still have study work remaining.</p>
-      ${goalSectionHtml(goal, false)}
-      <p style="margin:24px 0 0;color:#334155;font-size:14px;">Keep going — completing today's sessions will keep you on track.</p>
-      ${WRAPPER_CLOSE}`;
-    const text = `${greeting}\n\n${goal.goalName} needs your attention — you still have study work remaining.\n\n${goalSectionText(goal)}\n\nKeep going — completing today's sessions will keep you on track.`;
-    return { subject, html, text };
+function examSectionHtml(e: ExamReminderSummary): string {
+  return `
+    <tr>
+      <td style="padding:8px 0;border-top:1px solid #f1f5f9;color:#0f172a;font-size:14px;">${escapeHtml(e.title)}<br/><span style="color:#94a3b8;font-size:12px;">${escapeHtml(e.goalName)} — ${e.progressPercent}% reviewed</span></td>
+      <td style="padding:8px 0;border-top:1px solid #f1f5f9;color:#64748b;font-size:14px;text-align:right;white-space:nowrap;">${escapeHtml(e.examDateLabel)}</td>
+    </tr>`;
+}
+
+/** Builds a single-item or consolidated reminder email covering goals, assignments due today, and upcoming exams — however many of each are due at once. */
+export function buildReminderEmail(
+  userName: string,
+  goals: GoalReminderSummary[],
+  assignments: AssignmentReminderSummary[] = [],
+  exams: ExamReminderSummary[] = [],
+): ReminderEmailContent {
+  const greeting = userName ? `Hi ${userName},` : 'Hi,';
+  const totalCount = goals.length + assignments.length + exams.length;
+
+  let subject: string;
+  if (totalCount === 1) {
+    if (goals.length === 1) subject = `GoalFlow — ${goals[0].goalName} is still in progress`;
+    else if (assignments.length === 1) subject = `GoalFlow — ${assignments[0].title} is due today`;
+    else subject = `GoalFlow — ${exams[0].title} exam is coming up`;
+  } else {
+    subject = `GoalFlow — ${totalCount} items need your attention`;
   }
 
-  const subject = `GoalFlow — ${goals.length} goals need your attention`;
+  const assignmentsHtml =
+    assignments.length > 0
+      ? `<h2 style="margin:20px 0 8px;font-size:14px;color:#0f172a;">Assignments due today</h2><table role="presentation" width="100%">${assignments.map(assignmentSectionHtml).join('')}</table>`
+      : '';
+  const examsHtml =
+    exams.length > 0
+      ? `<h2 style="margin:20px 0 8px;font-size:14px;color:#0f172a;">Exams coming up</h2><table role="presentation" width="100%">${exams.map(examSectionHtml).join('')}</table>`
+      : '';
+  const goalsHtml =
+    goals.length > 0
+      ? goals.length === 1
+        ? goalSectionHtml(goals[0], false)
+        : goals.map((g) => `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid #f1f5f9;">${goalSectionHtml(g, true)}</div>`).join('')
+      : '';
+
+  const introText =
+    totalCount === 1
+      ? goals.length === 1
+        ? `<strong>${escapeHtml(goals[0].goalName)}</strong> needs your attention — you still have study work remaining.`
+        : assignments.length === 1
+          ? `<strong>${escapeHtml(assignments[0].title)}</strong> is due today.`
+          : `<strong>${escapeHtml(exams[0].title)}</strong> is coming up.`
+      : `<strong>${totalCount} items</strong> need your attention.`;
+
   const html = `${WRAPPER_OPEN}
     <p style="margin:0 0 4px;color:#0f172a;font-size:15px;">${greeting}</p>
-    <p style="margin:0 0 20px;color:#0f172a;font-size:15px;"><strong>${goals.length} goals</strong> still have study work remaining.</p>
-    ${goals.map((g) => `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid #f1f5f9;">${goalSectionHtml(g, true)}</div>`).join('')}
-    <p style="margin:8px 0 0;color:#334155;font-size:14px;">Keep going — completing today's sessions will keep you on track.</p>
+    <p style="margin:0 0 20px;color:#0f172a;font-size:15px;">${introText}</p>
+    ${goalsHtml}
+    ${assignmentsHtml}
+    ${examsHtml}
+    <p style="margin:24px 0 0;color:#334155;font-size:14px;">Keep going — completing today's work will keep you on track.</p>
     ${WRAPPER_CLOSE}`;
-  const text = `${greeting}\n\n${goals.length} goals still have study work remaining.\n\n${goals.map(goalSectionText).join('\n\n---\n\n')}\n\nKeep going — completing today's sessions will keep you on track.`;
+
+  const textParts = [`${greeting}`, ''];
+  if (goals.length > 0) textParts.push(goals.map(goalSectionText).join('\n\n---\n\n'));
+  if (assignments.length > 0) {
+    textParts.push('Assignments due today:');
+    for (const a of assignments) textParts.push(`  - ${a.title} (${a.goalName}) — due ${a.dueDateLabel}`);
+  }
+  if (exams.length > 0) {
+    textParts.push('Exams coming up:');
+    for (const e of exams) textParts.push(`  - ${e.title} (${e.goalName}) — ${e.examDateLabel}, ${e.progressPercent}% reviewed`);
+  }
+  textParts.push('', "Keep going — completing today's work will keep you on track.");
+  const text = textParts.join('\n');
+
   return { subject, html, text };
 }

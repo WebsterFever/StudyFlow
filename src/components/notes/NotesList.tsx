@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import type { StudyNote, StudyNoteInput, StudyNoteType } from '../../types'
+import type { LearningType, StudyNote, StudyNoteInput, StudyNoteType } from '../../types'
 import { Button } from '../ui/Button'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { NoteTypePicker } from './NoteTypePicker'
@@ -12,6 +12,7 @@ import { ProjectFolderUpload } from './ProjectFolderUpload'
 interface NotesListProps {
   goalId: string
   itemId: string
+  learningType: LearningType
   notes: StudyNote[]
   isLoading: boolean
   error: string | null
@@ -25,7 +26,7 @@ interface NotesListProps {
 
 type AddStep = 'closed' | 'picking' | 'code-source' | 'form' | 'project-upload' | 'saved'
 
-export function NotesList({ goalId, itemId, notes, isLoading, error, onAdd, onUpdate, onDelete, onProjectUploaded, emptyMessage }: NotesListProps) {
+export function NotesList({ goalId, itemId, learningType, notes, isLoading, error, onAdd, onUpdate, onDelete, onProjectUploaded, emptyMessage }: NotesListProps) {
   const [addStep, setAddStep] = useState<AddStep>('closed')
   const [addType, setAddType] = useState<StudyNoteType | null>(null)
   const [saving, setSaving] = useState(false)
@@ -91,7 +92,7 @@ export function NotesList({ goalId, itemId, notes, isLoading, error, onAdd, onUp
 
       {addStep === 'code-source' && (
         <div className="rounded-xl border border-slate-200 p-3.5 dark:border-slate-700">
-          <CodeSourcePicker onSelect={handleSelectCodeSource} />
+          <CodeSourcePicker onSelect={handleSelectCodeSource} allowProjectUpload={learningType === 'programming_technology'} />
           <div className="mt-3 flex justify-end">
             <Button variant="secondary" size="sm" onClick={() => setAddStep('closed')}>
               Cancel

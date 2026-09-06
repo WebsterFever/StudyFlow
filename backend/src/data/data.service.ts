@@ -8,6 +8,9 @@ import { DayOverride } from '../day-overrides/day-override.entity';
 import { StudyNote } from '../study-notes/study-note.entity';
 import { ProjectSnapshot } from '../project-snapshots/project-snapshot.entity';
 import { ProjectFile } from '../project-snapshots/project-file.entity';
+import { Assignment } from '../assignments/assignment.entity';
+import { Exam } from '../exams/exam.entity';
+import { ExamReviewItem } from '../exams/exam-review-item.entity';
 import { UsersService } from '../users/users.service';
 import { GoalBundleDto, ImportPayloadDto } from './dto/import-payload.dto';
 
@@ -46,6 +49,9 @@ export class DataService {
     const bundles = normalizeToBundles(payload);
 
     return this.dataSource.transaction(async (manager) => {
+      await manager.delete(ExamReviewItem, { userId });
+      await manager.delete(Exam, { userId });
+      await manager.delete(Assignment, { userId });
       await manager.delete(ProjectFile, { userId });
       await manager.delete(ProjectSnapshot, { userId });
       await manager.delete(StudyNote, { userId });
@@ -140,6 +146,9 @@ export class DataService {
   /** Wipes all study data (every goal) but keeps the user account itself. */
   async wipeAllData(userId: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
+      await manager.delete(ExamReviewItem, { userId });
+      await manager.delete(Exam, { userId });
+      await manager.delete(Assignment, { userId });
       await manager.delete(ProjectFile, { userId });
       await manager.delete(ProjectSnapshot, { userId });
       await manager.delete(StudyNote, { userId });

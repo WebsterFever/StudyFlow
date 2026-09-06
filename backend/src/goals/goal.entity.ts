@@ -13,6 +13,25 @@ export interface DailyHours {
 
 export type GoalStatus = 'active' | 'completed' | 'paused';
 
+export type LearningType =
+  | 'school_subject'
+  | 'college_course'
+  | 'programming_technology'
+  | 'language'
+  | 'certification'
+  | 'online_course'
+  | 'other';
+
+export const LEARNING_TYPES: LearningType[] = [
+  'school_subject',
+  'college_course',
+  'programming_technology',
+  'language',
+  'certification',
+  'online_course',
+  'other',
+];
+
 // A user can have many goals (Infnet, Frontend Mastery, React Advanced, ...),
 // each with its own independent study items, sessions and schedule.
 @Entity('study_goals')
@@ -42,6 +61,13 @@ export class StudyGoal {
 
   @Column({ type: 'varchar', length: 16, default: 'active' })
   status: GoalStatus;
+
+  // Defaults to 'programming_technology' via migration for pre-existing goals
+  // specifically so nobody's existing Code Notes/Project Snapshots become
+  // hidden by the learning-type gating added in Phase 2 — new goals pick a
+  // real value at creation time instead of relying on this default.
+  @Column({ type: 'varchar', length: 32, default: 'programming_technology' })
+  learningType: LearningType;
 
   @Column({ type: 'boolean', default: false })
   reminderEnabled: boolean;
