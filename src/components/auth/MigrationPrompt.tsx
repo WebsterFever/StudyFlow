@@ -80,7 +80,7 @@ export function MigrationPrompt() {
       <div className="flex gap-3">
         <CloudUpload size={22} className="mt-0.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
         <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-          <p>We found existing StudyFlow data on this device from before you signed in:</p>
+          <p>We found existing GoalFlow data on this device from before you signed in:</p>
           <ul className="list-inside list-disc space-y-0.5">
             {legacy.goal && <li>1 study goal ({legacy.goal.name})</li>}
             <li>{legacy.items.length} study item{legacy.items.length === 1 ? '' : 's'}</li>

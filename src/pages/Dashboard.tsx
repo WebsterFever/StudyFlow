@@ -33,7 +33,7 @@ export default function Dashboard() {
         title="No study goal yet"
         description="Create a goal with a start date and deadline to unlock your personalized study plan."
         action={
-          <Link to="/goals">
+          <Link to="/student/goals">
             <Button>Create your first goal</Button>
           </Link>
         }
@@ -68,7 +68,7 @@ export default function Dashboard() {
           title="No study content yet"
           description="Add your first lesson to generate your study plan."
           action={
-            <Link to="/content">
+            <Link to="/student/content">
               <Button>Add study content</Button>
             </Link>
           }
@@ -102,7 +102,7 @@ export default function Dashboard() {
             title="Today's study items"
             subtitle={todaySessions.length > 0 ? `${todaySessions.filter((s) => s.status === 'completed').length} of ${todaySessions.length} complete` : undefined}
             action={
-              <Link to="/today" className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+              <Link to="/student/today" className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
                 Go to Today
               </Link>
             }

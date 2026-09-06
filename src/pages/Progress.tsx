@@ -24,7 +24,7 @@ export default function Progress() {
         title="No progress to show yet"
         description="Add study content and complete a few lessons to see your progress here."
         action={
-          <Link to="/content">
+          <Link to="/student/content">
             <Button>Add study content</Button>
           </Link>
         }

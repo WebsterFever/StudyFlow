@@ -5,6 +5,8 @@ import { PublicOnlyRoute } from './components/auth/PublicOnlyRoute'
 import { StudyProvider } from './context/StudyContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import GoalFlowHome from './pages/GoalFlowHome'
+import PlannerFlowHome from './pages/PlannerFlowHome'
 import Dashboard from './pages/Dashboard'
 import Goals from './pages/Goals'
 import Today from './pages/Today'
@@ -31,14 +33,16 @@ function App() {
             </StudyProvider>
           }
         >
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/goals" element={<Goals />} />
-          <Route path="/today" element={<Today />} />
-          <Route path="/plan" element={<StudyPlan />} />
-          <Route path="/content" element={<StudyContent />} />
-          <Route path="/notes" element={<StudyNotes />} />
-          <Route path="/progress" element={<Progress />} />
-          <Route path="/statistics" element={<Statistics />} />
+          <Route path="/" element={<GoalFlowHome />} />
+          <Route path="/planner" element={<PlannerFlowHome />} />
+          <Route path="/student" element={<Dashboard />} />
+          <Route path="/student/goals" element={<Goals />} />
+          <Route path="/student/today" element={<Today />} />
+          <Route path="/student/plan" element={<StudyPlan />} />
+          <Route path="/student/content" element={<StudyContent />} />
+          <Route path="/student/notes" element={<StudyNotes />} />
+          <Route path="/student/progress" element={<Progress />} />
+          <Route path="/student/statistics" element={<Statistics />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
       </Route>

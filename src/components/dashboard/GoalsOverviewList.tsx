@@ -15,7 +15,7 @@ export function GoalsOverviewList() {
       <CardHeader
         title="Your goals"
         action={
-          <Link to="/goals" className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link to="/student/goals" className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
             Manage goals
           </Link>
         }

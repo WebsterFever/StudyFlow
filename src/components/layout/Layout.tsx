@@ -1,5 +1,5 @@
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, Loader2, Moon, Pause, Play, Sun, Timer as TimerIcon, WifiOff, X } from 'lucide-react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { AlertTriangle, Home, Loader2, Moon, Pause, Play, Sun, Timer as TimerIcon, WifiOff, X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { NAV_ITEMS } from './navConfig'
@@ -16,7 +16,7 @@ function ActiveTimerBanner() {
   const location = useLocation()
   const elapsed = useTimer(state.activeTimer)
 
-  if (!state.activeTimer || location.pathname === '/today') return null
+  if (!state.activeTimer || location.pathname === '/student/today') return null
 
   const item = state.items.find((i) => i.id === state.activeTimer?.itemId)
   const isPaused = state.activeTimer.isPaused
@@ -28,7 +28,7 @@ function ActiveTimerBanner() {
 
   return (
     <button
-      onClick={() => navigate('/today')}
+      onClick={() => navigate('/student/today')}
       className="flex w-full items-center justify-between gap-3 bg-indigo-600 px-4 py-2.5 text-left text-white sm:px-6"
     >
       <div className="flex min-w-0 items-center gap-2.5">
@@ -84,6 +84,7 @@ export function Layout() {
   const { theme, toggleTheme } = useTheme()
   const { isLoading, loadError, retryLoad } = useStudy()
   const current = NAV_ITEMS.find((i) => (i.end ? location.pathname === i.to : location.pathname.startsWith(i.to)))
+  const headerTitle = location.pathname === '/' ? 'GoalFlow' : location.pathname.startsWith('/planner') ? 'PlannerFlow' : (current?.label ?? 'GoalFlow')
 
   if (isLoading) {
     return (
@@ -115,7 +116,18 @@ export function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <ActiveTimerBanner />
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3.5 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{current?.label ?? 'StudyFlow'}</h1>
+          <div className="flex items-center gap-2">
+            {location.pathname !== '/' && (
+              <Link
+                to="/"
+                aria-label="GoalFlow home"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 md:hidden"
+              >
+                <Home size={18} />
+              </Link>
+            )}
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{headerTitle}</h1>
+          </div>
           <button
             onClick={toggleTheme}
             aria-label="Toggle dark mode"

@@ -25,7 +25,7 @@ export default function StudyPlan() {
         title="No study goal yet"
         description="Create a goal with daily availability to generate a study plan."
         action={
-          <Link to="/goals">
+          <Link to="/student/goals">
             <Button>Create a goal</Button>
           </Link>
         }

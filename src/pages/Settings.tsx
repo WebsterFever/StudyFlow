@@ -61,7 +61,7 @@ export default function Settings() {
     try {
       const data = await readJsonFile<MultiGoalPayload>(file)
       if (!data || !Array.isArray(data.goals)) {
-        throw new Error('That file does not look like a valid StudyFlow backup.')
+        throw new Error('That file does not look like a valid GoalFlow backup.')
       }
       await importData(data)
       setImportError(null)
@@ -147,7 +147,7 @@ export default function Settings() {
       <Card>
         <CardHeader title="Demo data" subtitle="Add a sample goal covering HTML, CSS, JavaScript, TypeScript and React" />
         <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-          This adds a new "Master Frontend Development" goal alongside any goals you already have, so you can try StudyFlow immediately without
+          This adds a new "Master Frontend Development" goal alongside any goals you already have, so you can try GoalFlow immediately without
           losing anything. You can delete it any time from the Goals page.
         </p>
         <Button variant="secondary" icon={<Sparkles size={16} />} onClick={() => setConfirmDemo(true)}>

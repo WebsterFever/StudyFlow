@@ -52,7 +52,7 @@ export default function StudyNotes() {
         title="No study goal yet"
         description="Create a goal to start taking notes."
         action={
-          <Link to="/goals">
+          <Link to="/student/goals">
             <Button>Create a goal</Button>
           </Link>
         }

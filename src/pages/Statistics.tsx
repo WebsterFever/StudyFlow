@@ -37,7 +37,7 @@ export default function Statistics() {
         title="Nothing to analyze yet"
         description="Complete a few study sessions to unlock your statistics."
         action={
-          <Link to="/content">
+          <Link to="/student/content">
             <Button>Add study content</Button>
           </Link>
         }

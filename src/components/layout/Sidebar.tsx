@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom'
-import { Flame, GraduationCap, LogOut } from 'lucide-react'
+import { Flame, LogOut, Target } from 'lucide-react'
 import { NAV_ITEMS } from './navConfig'
 import { GoalSwitcher } from './GoalSwitcher'
+import { FlowSwitcher } from './FlowSwitcher'
 import { useStudy } from '../../hooks/useStudy'
 import { useAuth } from '../../hooks/useAuth'
 import { computeStreak } from '../../utils/streak'
@@ -15,13 +16,15 @@ export function Sidebar() {
     <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 md:flex">
       <div className="flex items-center gap-2 px-5 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white">
-          <GraduationCap size={20} />
+          <Target size={20} />
         </div>
         <div>
-          <p className="text-sm font-bold leading-tight text-slate-900 dark:text-slate-100">StudyFlow</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Study planner</p>
+          <p className="text-sm font-bold leading-tight text-slate-900 dark:text-slate-100">GoalFlow</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">One account. Your goals.</p>
         </div>
       </div>
+
+      <FlowSwitcher className="mx-3 mb-3" />
 
       <GoalSwitcher />
 

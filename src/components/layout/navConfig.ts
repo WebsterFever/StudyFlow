@@ -19,13 +19,13 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/goals', label: 'Goals', icon: Flag },
-  { to: '/today', label: 'Today', icon: Target },
-  { to: '/plan', label: 'Study Plan', icon: CalendarRange },
-  { to: '/content', label: 'Study Content', icon: BookOpen },
-  { to: '/notes', label: 'Study Notes', icon: NotebookPen },
-  { to: '/progress', label: 'Progress', icon: TrendingUp },
-  { to: '/statistics', label: 'Statistics', icon: BarChart3 },
+  { to: '/student', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/student/goals', label: 'Goals', icon: Flag },
+  { to: '/student/today', label: 'Today', icon: Target },
+  { to: '/student/plan', label: 'Study Plan', icon: CalendarRange },
+  { to: '/student/content', label: 'Study Content', icon: BookOpen },
+  { to: '/student/notes', label: 'Study Notes', icon: NotebookPen },
+  { to: '/student/progress', label: 'Progress', icon: TrendingUp },
+  { to: '/student/statistics', label: 'Statistics', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]

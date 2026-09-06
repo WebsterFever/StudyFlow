@@ -35,7 +35,7 @@ export function MasteryModal({ open, itemTitle, onRate, onSkip }: MasteryModalPr
     >
       <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
         Nice work finishing <span className="font-medium text-slate-900 dark:text-slate-100">{itemTitle}</span>. Rate your
-        mastery so StudyFlow can suggest review sessions.
+        mastery so GoalFlow can suggest review sessions.
       </p>
       <div className="space-y-2">
         {RATINGS.map((rating) => (

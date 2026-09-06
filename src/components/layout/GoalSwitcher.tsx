@@ -50,7 +50,7 @@ export function GoalSwitcher() {
           ))}
           <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
           <Link
-            to="/goals"
+            to="/student/goals"
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/40"
           >

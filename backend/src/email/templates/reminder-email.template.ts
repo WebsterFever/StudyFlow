@@ -37,7 +37,7 @@ const WRAPPER_OPEN = `
 <div style="background:#f8fafc;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
     <div style="background:#4f46e5;padding:20px 28px;">
-      <span style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.02em;">StudyFlow</span>
+      <span style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.02em;">GoalFlow</span>
     </div>
     <div style="padding:28px;">
 `;
@@ -45,7 +45,7 @@ const WRAPPER_OPEN = `
 const WRAPPER_CLOSE = `
     </div>
     <div style="padding:20px 28px;border-top:1px solid #f1f5f9;">
-      <p style="margin:0;color:#94a3b8;font-size:12px;">You're receiving this because reminders are enabled for this goal. Turn them off any time from the goal's settings in StudyFlow.</p>
+      <p style="margin:0;color:#94a3b8;font-size:12px;">You're receiving this because reminders are enabled for this goal. Turn them off any time from the goal's settings in GoalFlow.</p>
     </div>
   </div>
 </div>
@@ -120,7 +120,7 @@ export function buildReminderEmail(userName: string, goals: GoalReminderSummary[
 
   if (goals.length === 1) {
     const goal = goals[0];
-    const subject = `StudyFlow — ${goal.goalName} is still in progress`;
+    const subject = `GoalFlow — ${goal.goalName} is still in progress`;
     const html = `${WRAPPER_OPEN}
       <p style="margin:0 0 4px;color:#0f172a;font-size:15px;">${greeting}</p>
       <p style="margin:0 0 20px;color:#0f172a;font-size:15px;"><strong>${escapeHtml(goal.goalName)}</strong> needs your attention — you still have study work remaining.</p>
@@ -131,7 +131,7 @@ export function buildReminderEmail(userName: string, goals: GoalReminderSummary[
     return { subject, html, text };
   }
 
-  const subject = `StudyFlow — ${goals.length} goals need your attention`;
+  const subject = `GoalFlow — ${goals.length} goals need your attention`;
   const html = `${WRAPPER_OPEN}
     <p style="margin:0 0 4px;color:#0f172a;font-size:15px;">${greeting}</p>
     <p style="margin:0 0 20px;color:#0f172a;font-size:15px;"><strong>${goals.length} goals</strong> still have study work remaining.</p>
