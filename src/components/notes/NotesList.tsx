@@ -6,20 +6,26 @@ import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { NoteTypePicker } from './NoteTypePicker'
 import { NoteForm } from './NoteForm'
 import { NoteCard } from './NoteCard'
+import { CodeSourcePicker, type CodeSource } from './CodeSourcePicker'
+import { ProjectFolderUpload } from './ProjectFolderUpload'
 
 interface NotesListProps {
+  goalId: string
+  itemId: string
   notes: StudyNote[]
   isLoading: boolean
   error: string | null
   onAdd: (input: StudyNoteInput) => Promise<unknown>
   onUpdate: (id: string, patch: Partial<StudyNoteInput>) => Promise<unknown>
   onDelete: (id: string) => Promise<unknown>
+  /** Called after a project-folder upload completes, since that note is created via a separate API call and won't be in `notes` until refetched. */
+  onProjectUploaded: () => void
   emptyMessage?: string
 }
 
-type AddStep = 'closed' | 'picking' | 'form' | 'saved'
+type AddStep = 'closed' | 'picking' | 'code-source' | 'form' | 'project-upload' | 'saved'
 
-export function NotesList({ notes, isLoading, error, onAdd, onUpdate, onDelete, emptyMessage }: NotesListProps) {
+export function NotesList({ goalId, itemId, notes, isLoading, error, onAdd, onUpdate, onDelete, onProjectUploaded, emptyMessage }: NotesListProps) {
   const [addStep, setAddStep] = useState<AddStep>('closed')
   const [addType, setAddType] = useState<StudyNoteType | null>(null)
   const [saving, setSaving] = useState(false)
@@ -32,7 +38,11 @@ export function NotesList({ notes, isLoading, error, onAdd, onUpdate, onDelete, 
 
   const handleSelectType = (type: StudyNoteType) => {
     setAddType(type)
-    setAddStep('form')
+    setAddStep(type === 'code' ? 'code-source' : 'form')
+  }
+
+  const handleSelectCodeSource = (source: CodeSource) => {
+    setAddStep(source === 'snippet' ? 'form' : 'project-upload')
   }
 
   const handleSave = async (input: StudyNoteInput) => {
@@ -43,6 +53,11 @@ export function NotesList({ notes, isLoading, error, onAdd, onUpdate, onDelete, 
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleProjectUploaded = () => {
+    onProjectUploaded()
+    setAddStep('saved')
   }
 
   if (isLoading) {
@@ -74,9 +89,26 @@ export function NotesList({ notes, isLoading, error, onAdd, onUpdate, onDelete, 
         </div>
       )}
 
+      {addStep === 'code-source' && (
+        <div className="rounded-xl border border-slate-200 p-3.5 dark:border-slate-700">
+          <CodeSourcePicker onSelect={handleSelectCodeSource} />
+          <div className="mt-3 flex justify-end">
+            <Button variant="secondary" size="sm" onClick={() => setAddStep('closed')}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
       {addStep === 'form' && addType && (
         <div className="rounded-xl border border-slate-200 p-3.5 dark:border-slate-700">
           <NoteForm type={addType} onSave={handleSave} onCancel={() => setAddStep('closed')} saving={saving} submitLabel="Save note" />
+        </div>
+      )}
+
+      {addStep === 'project-upload' && (
+        <div className="rounded-xl border border-slate-200 p-3.5 dark:border-slate-700">
+          <ProjectFolderUpload goalId={goalId} studyItemId={itemId} onUploaded={handleProjectUploaded} onCancel={() => setAddStep('closed')} />
         </div>
       )}
 

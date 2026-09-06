@@ -31,6 +31,11 @@ function assertValidNotePayload(type: StudyNoteType, fields: { title?: string | 
       if (!url) throw new BadRequestException('A resource note needs a URL.');
       if (!isValidUrl(url)) throw new BadRequestException('That URL does not look valid.');
       break;
+    case 'project':
+      // Project snapshots are created exclusively via POST /project-snapshots
+      // (the file-list payload doesn't fit this generic note shape) — blocking
+      // it here stops a caller from creating a broken, snapshot-less "project" note.
+      throw new BadRequestException('Project snapshots must be created by uploading a project folder.');
     case 'text':
     case 'important':
     case 'command':

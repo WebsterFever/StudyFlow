@@ -9,6 +9,7 @@ import { StudyItemsModule } from './study-items/study-items.module';
 import { StudySessionsModule } from './study-sessions/study-sessions.module';
 import { DayOverridesModule } from './day-overrides/day-overrides.module';
 import { StudyNotesModule } from './study-notes/study-notes.module';
+import { ProjectSnapshotsModule } from './project-snapshots/project-snapshots.module';
 import { DataModule } from './data/data.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { HealthController } from './health.controller';
@@ -37,6 +38,7 @@ import { HealthController } from './health.controller';
     StudySessionsModule,
     DayOverridesModule,
     StudyNotesModule,
+    ProjectSnapshotsModule,
     DataModule,
     RemindersModule,
   ],

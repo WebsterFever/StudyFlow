@@ -14,17 +14,21 @@ import 'prismjs/components/prism-python'
 import 'prismjs/components/prism-java'
 import 'prismjs/components/prism-csharp'
 import 'prismjs/components/prism-sql'
+import 'prismjs/components/prism-yaml'
 import { codePrismLang } from '../../utils/codeLanguages'
 
 interface CodeBlockProps {
   code: string
-  language: string | null
+  /** A manual-code-note "language value" (e.g. 'tsx', 'python') — resolved to a Prism grammar internally. */
+  language?: string | null
+  /** An already-resolved Prism grammar name — takes priority over `language` when given (used for uploaded project files, keyed by extension instead). */
+  prismLang?: string | null
 }
 
-export function CodeBlock({ code, language }: CodeBlockProps) {
+export function CodeBlock({ code, language, prismLang: prismLangOverride }: CodeBlockProps) {
   const codeRef = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
-  const prismLang = codePrismLang(language)
+  const prismLang = prismLangOverride !== undefined ? prismLangOverride : codePrismLang(language ?? null)
 
   useEffect(() => {
     if (codeRef.current && prismLang && Prism.languages[prismLang]) {

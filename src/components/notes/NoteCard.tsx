@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Check, Copy, ExternalLink, HelpCircle, Pencil, Trash2 } from 'lucide-react'
+import { AlertTriangle, Check, Copy, ExternalLink, FolderOpen, HelpCircle, Pencil, Trash2 } from 'lucide-react'
 import type { StudyNote, StudyNoteInput } from '../../types'
 import { STUDY_NOTE_TYPE_LABELS } from '../../types'
 import { Badge, type Tone } from '../ui/Badge'
 import { Textarea, Input, Select } from '../ui/Form'
+import { Button } from '../ui/Button'
 import { CodeBlock } from './CodeBlock'
+import { ProjectViewer } from './ProjectViewer'
 import { CODE_LANGUAGE_OPTIONS, codeLanguageLabel } from '../../utils/codeLanguages'
 
 const TYPE_TONE: Record<StudyNote['type'], Tone> = {
@@ -14,6 +16,7 @@ const TYPE_TONE: Record<StudyNote['type'], Tone> = {
   question: 'purple',
   command: 'blue',
   resource: 'green',
+  project: 'purple',
 }
 
 const AUTOSAVE_DELAY_MS = 1000
@@ -27,6 +30,7 @@ interface NoteCardProps {
 export function NoteCard({ note, onUpdate, onDelete }: NoteCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [projectViewerOpen, setProjectViewerOpen] = useState(false)
 
   const [title, setTitle] = useState(note.title ?? '')
   const [content, setContent] = useState(note.content ?? '')
@@ -93,13 +97,17 @@ export function NoteCard({ note, onUpdate, onDelete }: NoteCardProps) {
               Done
             </button>
           ) : (
-            <button
-              onClick={startEditing}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
-              aria-label="Edit note"
-            >
-              <Pencil size={14} />
-            </button>
+            // Project snapshots are read-only file collections — there's nothing
+            // here to edit (renaming isn't wired up), so no Edit button at all.
+            note.type !== 'project' && (
+              <button
+                onClick={startEditing}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                aria-label="Edit note"
+              >
+                <Pencil size={14} />
+              </button>
+            )
           )}
           <button
             onClick={() => onDelete(note)}
@@ -140,14 +148,40 @@ export function NoteCard({ note, onUpdate, onDelete }: NoteCardProps) {
           />
         </div>
       ) : (
-        <NoteView note={note} copied={copied} onCopyCommand={handleCopyCommand} />
+        <NoteView note={note} copied={copied} onCopyCommand={handleCopyCommand} onOpenProject={() => setProjectViewerOpen(true)} />
+      )}
+
+      {projectViewerOpen && note.projectSnapshotId && (
+        <ProjectViewer snapshotId={note.projectSnapshotId} onClose={() => setProjectViewerOpen(false)} />
       )}
     </div>
   )
 }
 
-function NoteView({ note, copied, onCopyCommand }: { note: StudyNote; copied: boolean; onCopyCommand: () => void }) {
+function NoteView({
+  note,
+  copied,
+  onCopyCommand,
+  onOpenProject,
+}: {
+  note: StudyNote
+  copied: boolean
+  onCopyCommand: () => void
+  onOpenProject: () => void
+}) {
   switch (note.type) {
+    case 'project':
+      return (
+        <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-900/60">
+          <div>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{note.title}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{note.content}</p>
+          </div>
+          <Button size="sm" variant="secondary" icon={<FolderOpen size={14} />} onClick={onOpenProject}>
+            Open Project
+          </Button>
+        </div>
+      )
     case 'code':
       return (
         <div className="space-y-2">

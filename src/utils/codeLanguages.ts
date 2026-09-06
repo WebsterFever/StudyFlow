@@ -31,3 +31,25 @@ export function codeLanguageLabel(value: string | null): string {
 export function codePrismLang(value: string | null): string | null {
   return CODE_LANGUAGE_OPTIONS.find((o) => o.value === value)?.prismLang ?? null
 }
+
+// Extension -> Prism grammar, for displaying uploaded project files (which
+// carry a file extension, not one of the manual-code-note language values above).
+const EXTENSION_PRISM_MAP: Record<string, string> = {
+  html: 'markup', htm: 'markup', xml: 'markup', vue: 'markup', svelte: 'markup',
+  css: 'css', scss: 'css', sass: 'css', less: 'css',
+  js: 'javascript', jsx: 'jsx', mjs: 'javascript', cjs: 'javascript',
+  ts: 'typescript', tsx: 'tsx',
+  json: 'json', jsonc: 'json',
+  py: 'python',
+  java: 'java',
+  cs: 'csharp',
+  sql: 'sql',
+  sh: 'bash', bash: 'bash', zsh: 'bash',
+  yml: 'yaml', yaml: 'yaml',
+  c: 'clike', cpp: 'clike', cc: 'clike', h: 'clike', hpp: 'clike',
+} // eslint-disable-line prettier/prettier
+
+export function prismLangForExtension(extension: string | null): string | null {
+  if (!extension) return null
+  return EXTENSION_PRISM_MAP[extension.toLowerCase()] ?? null
+}

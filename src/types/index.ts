@@ -153,9 +153,9 @@ export interface ReviewSuggestion {
   dueDates: string[] // ISO yyyy-mm-dd suggested review dates
 }
 
-export type StudyNoteType = 'text' | 'code' | 'important' | 'question' | 'command' | 'resource'
+export type StudyNoteType = 'text' | 'code' | 'important' | 'question' | 'command' | 'resource' | 'project'
 
-export const STUDY_NOTE_TYPES: StudyNoteType[] = ['text', 'code', 'important', 'question', 'command', 'resource']
+export const STUDY_NOTE_TYPES: StudyNoteType[] = ['text', 'code', 'important', 'question', 'command', 'resource', 'project']
 
 export const STUDY_NOTE_TYPE_LABELS: Record<StudyNoteType, string> = {
   text: 'Text',
@@ -164,6 +164,7 @@ export const STUDY_NOTE_TYPE_LABELS: Record<StudyNoteType, string> = {
   question: 'Question',
   command: 'Command',
   resource: 'Resource',
+  project: 'Project Snapshot',
 }
 
 export interface StudyNote {
@@ -176,9 +177,28 @@ export interface StudyNote {
   fileName: string | null
   codeLanguage: string | null
   url: string | null
+  /** Set only for type: 'project' — points at the ProjectSnapshot to open. */
+  projectSnapshotId: string | null
   sortOrder: number
   createdAt: string // ISO datetime
   updatedAt: string // ISO datetime
+}
+
+export interface ProjectSnapshotSummary {
+  id: string
+  name: string
+  fileCount: number
+  totalSize: number
+  createdAt: string
+}
+
+export interface ProjectFileMeta {
+  id: string
+  path: string
+  name: string
+  extension: string | null
+  size: number
+  content: string | null // null when the file type isn't displayable as text
 }
 
 /** What a note create/edit form collects, before the backend assigns id/sortOrder. */
