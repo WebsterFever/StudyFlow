@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
-import { AlertCircle, Bell, CheckCircle2, Database, Download, LogOut, Mail, Sparkles, Trash2, Upload, User as UserIcon } from 'lucide-react'
+import { AlertCircle, Bell, CheckCircle2, ClipboardList, Database, Download, GraduationCap, LogOut, Mail, Sparkles, Trash2, Upload, User as UserIcon } from 'lucide-react'
 import { useStudy } from '../hooks/useStudy'
 import { usePlanner } from '../hooks/usePlanner'
 import { useAuth } from '../hooks/useAuth'
+import { useDefaultFlow } from '../hooks/useDefaultFlow'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
@@ -18,6 +19,7 @@ export default function Settings() {
   const { exportData, importData, resetData, loadDemoData } = useStudy()
   const { resetLocalState: resetPlannerLocalState } = usePlanner()
   const { user, logout, setUserProfile } = useAuth()
+  const { defaultFlow, setDefaultFlow } = useDefaultFlow()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importBusy, setImportBusy] = useState(false)
@@ -89,6 +91,31 @@ export default function Settings() {
         <div className="mt-4">
           <Button variant="secondary" icon={<LogOut size={16} />} onClick={() => setConfirmLogout(true)}>
             Log out
+          </Button>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Default landing page" subtitle="Where you land after logging in — the GoalFlow picker is always one click away" />
+        <div className="flex flex-wrap gap-2">
+          <Button variant={defaultFlow === 'ask' ? 'primary' : 'secondary'} size="sm" onClick={() => setDefaultFlow('ask')}>
+            Always ask
+          </Button>
+          <Button
+            variant={defaultFlow === 'student' ? 'primary' : 'secondary'}
+            size="sm"
+            icon={<GraduationCap size={14} />}
+            onClick={() => setDefaultFlow('student')}
+          >
+            StudentFlow
+          </Button>
+          <Button
+            variant={defaultFlow === 'planner' ? 'primary' : 'secondary'}
+            size="sm"
+            icon={<ClipboardList size={14} />}
+            onClick={() => setDefaultFlow('planner')}
+          >
+            PlannerFlow
           </Button>
         </div>
       </Card>

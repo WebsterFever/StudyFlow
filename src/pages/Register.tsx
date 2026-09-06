@@ -6,9 +6,11 @@ import { AuthShell } from '../components/auth/AuthShell'
 import { Field, Input } from '../components/ui/Form'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../hooks/useAuth'
+import { useDefaultFlow } from '../hooks/useDefaultFlow'
 
 export default function Register() {
   const { register } = useAuth()
+  const { defaultFlow } = useDefaultFlow()
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -31,7 +33,7 @@ export default function Register() {
     setSubmitting(true)
     try {
       await register({ name, email, password, confirmPassword })
-      navigate('/', { replace: true })
+      navigate(defaultFlow === 'student' ? '/student' : defaultFlow === 'planner' ? '/planner' : '/', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed.')
     } finally {

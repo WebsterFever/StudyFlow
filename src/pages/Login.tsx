@@ -6,9 +6,11 @@ import { AuthShell } from '../components/auth/AuthShell'
 import { Field, Input } from '../components/ui/Form'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../hooks/useAuth'
+import { useDefaultFlow } from '../hooks/useDefaultFlow'
 
 export default function Login() {
   const { login } = useAuth()
+  const { defaultFlow } = useDefaultFlow()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
@@ -16,7 +18,10 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const redirectTo = (location.state as { from?: string } | null)?.from ?? '/'
+  // Only honor the default-flow shortcut when there's no specific deep link
+  // to return to — a page that redirected here to log in always wins.
+  const requestedFrom = (location.state as { from?: string } | null)?.from
+  const redirectTo = requestedFrom ?? (defaultFlow === 'student' ? '/student' : defaultFlow === 'planner' ? '/planner' : '/')
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()

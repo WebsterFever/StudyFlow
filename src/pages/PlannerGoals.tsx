@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, Plus } from 'lucide-react'
 import { usePlanner } from '../hooks/usePlanner'
+import { useEntitlements } from '../hooks/useEntitlements'
 import { Button } from '../components/ui/Button'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
@@ -11,13 +12,17 @@ import type { PlannerGoal, PlannerGoalInput } from '../types'
 
 export default function PlannerGoals() {
   const { state, setActiveGoalId, createGoal, updateGoal, deleteGoal } = usePlanner()
+  const { canCreatePlannerGoal, limits } = useEntitlements()
   const navigate = useNavigate()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingGoal, setEditingGoal] = useState<PlannerGoal | null>(null)
   const [deletingGoal, setDeletingGoal] = useState<PlannerGoal | null>(null)
 
+  const atGoalLimit = !canCreatePlannerGoal(state.goals.length)
+
   const openCreate = () => {
+    if (atGoalLimit) return
     setEditingGoal(null)
     setFormOpen(true)
   }
@@ -43,10 +48,16 @@ export default function PlannerGoals() {
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Planner Goals</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">Manage every goal you're working toward</p>
         </div>
-        <Button icon={<Plus size={16} />} onClick={openCreate}>
+        <Button icon={<Plus size={16} />} onClick={openCreate} disabled={atGoalLimit} title={atGoalLimit ? `Your plan allows up to ${limits.maxPlannerGoals} goals` : undefined}>
           New Goal
         </Button>
       </div>
+
+      {atGoalLimit && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+          You've reached your plan's goal limit ({limits.maxPlannerGoals}). Upgrade to add more.
+        </p>
+      )}
 
       {state.goals.length === 0 ? (
         <EmptyState
