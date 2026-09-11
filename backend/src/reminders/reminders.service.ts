@@ -12,7 +12,7 @@ import { PlannerTask } from '../planner-tasks/planner-task.entity';
 import { User } from '../users/user.entity';
 import { EmailService } from '../email/email.service';
 import {
-  buildReminderEmail,
+  buildGoalReminderEmail,
   type AssignmentReminderSummary,
   type ExamReminderSummary,
   type GoalReminderSummary,
@@ -22,10 +22,9 @@ import {
 import { currentMinutesInTimezone, formatFriendlyDate, isWithinQuietHours, parseHHMM, todayInTimezone } from '../common/timezone.util';
 
 export interface ReminderRunSummary {
-  processed: number;
-  due: number;
-  usersEmailed: number;
-  sent: number;
+  goalsProcessed: number;
+  goalsDue: number;
+  emailsSent: number;
   skipped: number;
   failed: number;
   details: {
@@ -35,20 +34,28 @@ export interface ReminderRunSummary {
   };
 }
 
-interface UserDueItems {
+/**
+ * One entry per DUE goal (never per user) — this is the unit a reminder
+ * email is built around. A StudentFlow goal's due assignments/exams and a
+ * PlannerFlow goal's due tasks are folded in here because they belong to
+ * that goal; a second due goal always gets its own separate entry/email.
+ */
+interface GoalEmailGroup {
   user: User;
-  goals: StudyGoal[];
-  assignments: Assignment[];
-  exams: Exam[];
-  plannerGoals: PlannerGoal[];
-  plannerTasks: PlannerTask[];
+  flow: 'student' | 'planner';
+  goalId: string;
+  goalName: string;
+  dueGoal?: StudyGoal;
+  dueAssignments: Assignment[];
+  dueExams: Exam[];
+  duePlannerGoal?: PlannerGoal;
+  duePlannerTasks: PlannerTask[];
 }
 
 const EMPTY_SUMMARY: ReminderRunSummary = {
-  processed: 0,
-  due: 0,
-  usersEmailed: 0,
-  sent: 0,
+  goalsProcessed: 0,
+  goalsDue: 0,
+  emailsSent: 0,
   skipped: 0,
   failed: 0,
   details: { skippedNotDue: 0, skippedQuietHours: 0, lostClaimRace: 0 },
@@ -100,143 +107,148 @@ export class RemindersService {
     );
 
     const now = Date.now();
-    const dueGoals: StudyGoal[] = [];
-    let skippedNotDue = 0;
-    for (const goal of goalCandidates) {
-      if (this.isRecurringGoalDue(goal.lastReminderSentAt, goal.reminderIntervalMinutes, now)) dueGoals.push(goal);
-      else skippedNotDue++;
-    }
-
-    const duePlannerGoals: PlannerGoal[] = [];
-    for (const goal of plannerGoalCandidates) {
-      if (this.isRecurringGoalDue(goal.lastReminderSentAt, goal.reminderIntervalMinutes, now)) duePlannerGoals.push(goal);
-      else skippedNotDue++;
-    }
-
+    const dueGoals = goalCandidates.filter((goal) => this.isRecurringGoalDue(goal.lastReminderSentAt, goal.reminderIntervalMinutes, now));
+    const duePlannerGoals = plannerGoalCandidates.filter((goal) => this.isRecurringGoalDue(goal.lastReminderSentAt, goal.reminderIntervalMinutes, now));
     const dueAssignments = assignmentCandidates.filter((a) => a.dueDate <= todayInTimezone(a.user.timezone));
-    skippedNotDue += assignmentCandidates.length - dueAssignments.length;
-
     const dueExams = examCandidates.filter((e) => e.examDate <= todayInTimezone(e.user.timezone));
-    skippedNotDue += examCandidates.length - dueExams.length;
-
     const duePlannerTasks = plannerTaskCandidates.filter((t) => t.dueDate && t.dueDate <= todayInTimezone(t.user.timezone));
-    skippedNotDue += plannerTaskCandidates.length - duePlannerTasks.length;
 
-    const totalDue = dueGoals.length + dueAssignments.length + dueExams.length + duePlannerGoals.length + duePlannerTasks.length;
-    this.logger.log(
-      `${totalDue} reminders due (${dueGoals.length} goals, ${dueAssignments.length} assignments, ${dueExams.length} exams, ${duePlannerGoals.length} planner goals, ${duePlannerTasks.length} planner tasks)`,
-    );
-
-    const byUser = new Map<string, UserDueItems>();
-    const ensureEntry = (userId: string, user: User): UserDueItems => {
-      let entry = byUser.get(userId);
-      if (!entry) {
-        entry = { user, goals: [], assignments: [], exams: [], plannerGoals: [], plannerTasks: [] };
-        byUser.set(userId, entry);
+    // Group every due signal by the goal that owns it — never by user. A
+    // StudentFlow goal's own recurring fire, plus any due assignments/exams
+    // attached to that same goal, land in one group (they genuinely belong
+    // together). A different goal — even for the same user, even in the
+    // same StudentFlow/PlannerFlow flow — always gets its own group, which
+    // is what guarantees one email per goal instead of one combined email
+    // per user.
+    const groups = new Map<string, GoalEmailGroup>();
+    const ensureGroup = (flow: 'student' | 'planner', goalId: string, goalName: string, user: User): GoalEmailGroup => {
+      const key = `${flow}:${goalId}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = { user, flow, goalId, goalName, dueAssignments: [], dueExams: [], duePlannerTasks: [] };
+        groups.set(key, group);
       }
-      return entry;
+      return group;
     };
-    for (const goal of dueGoals) ensureEntry(goal.userId, goal.user).goals.push(goal);
-    for (const assignment of dueAssignments) ensureEntry(assignment.userId, assignment.user).assignments.push(assignment);
-    for (const exam of dueExams) ensureEntry(exam.userId, exam.user).exams.push(exam);
-    for (const goal of duePlannerGoals) ensureEntry(goal.userId, goal.user).plannerGoals.push(goal);
-    for (const task of duePlannerTasks) ensureEntry(task.userId, task.user).plannerTasks.push(task);
+    for (const goal of dueGoals) ensureGroup('student', goal.id, goal.name, goal.user).dueGoal = goal;
+    for (const assignment of dueAssignments) ensureGroup('student', assignment.goalId, assignment.goal?.name ?? 'Goal', assignment.user).dueAssignments.push(assignment);
+    for (const exam of dueExams) ensureGroup('student', exam.goalId, exam.goal?.name ?? 'Goal', exam.user).dueExams.push(exam);
+    for (const goal of duePlannerGoals) ensureGroup('planner', goal.id, goal.name, goal.user).duePlannerGoal = goal;
+    for (const task of duePlannerTasks) ensureGroup('planner', task.goalId, task.goal?.name ?? 'Goal', task.user).duePlannerTasks.push(task);
 
-    let sent = 0;
+    // "goalsProcessed" counts every distinct goal that had ANY eligible
+    // (not necessarily due) signal this run, so the not-due ones are
+    // reflected in `skipped` below rather than silently disappearing.
+    const candidateGoalKeys = new Set<string>();
+    for (const goal of goalCandidates) candidateGoalKeys.add(`student:${goal.id}`);
+    for (const assignment of assignmentCandidates) candidateGoalKeys.add(`student:${assignment.goalId}`);
+    for (const exam of examCandidates) candidateGoalKeys.add(`student:${exam.goalId}`);
+    for (const goal of plannerGoalCandidates) candidateGoalKeys.add(`planner:${goal.id}`);
+    for (const task of plannerTaskCandidates) candidateGoalKeys.add(`planner:${task.goalId}`);
+    const goalsProcessed = candidateGoalKeys.size;
+    const goalsDue = groups.size;
+    this.logger.log(`${goalsDue} goals due for a reminder this run (out of ${goalsProcessed} eligible)`);
+
+    let emailsSent = 0;
     let failed = 0;
     let skippedQuietHours = 0;
     let lostClaimRace = 0;
-    let usersEmailed = 0;
 
-    for (const { user, goals, assignments, exams, plannerGoals, plannerTasks } of byUser.values()) {
-      const totalForUser = goals.length + assignments.length + exams.length + plannerGoals.length + plannerTasks.length;
-
-      if (this.isUserInQuietHours(user)) {
+    for (const group of groups.values()) {
+      if (this.isUserInQuietHours(group.user)) {
         // Deliberately do not claim/update anything here — leaving it
-        // untouched means the very next (non-quiet-hours) run sees the same
-        // items as still due, with no separate deferred-send bookkeeping needed.
-        skippedQuietHours += totalForUser;
+        // untouched means the very next (non-quiet-hours) run sees this
+        // goal as still due, with no separate deferred-send bookkeeping needed.
+        skippedQuietHours++;
         continue;
       }
 
-      // Atomically claim each due item before sending. The scheduler runs
-      // every 5 minutes and a Lambda/EventBridge retry can overlap a prior
-      // run — these conditional UPDATEs ensure only one concurrent run can
-      // ever win a given row, so nothing is ever reminded twice.
+      // Atomically claim every due signal for THIS goal before sending.
+      // The scheduler runs every 5 minutes and a Lambda/EventBridge retry
+      // can overlap a prior run — these conditional UPDATEs ensure only one
+      // concurrent run can ever win a given row, so nothing is ever
+      // reminded twice. Claiming is scoped per goal, so one goal's lost
+      // race never affects another goal's claim/send in the same run.
       const claimedAt = new Date();
-      const claimedGoals: StudyGoal[] = [];
-      for (const goal of goals) {
-        if (await this.claimRecurringGoal(this.goalsRepository, StudyGoal, goal, claimedAt, 'active')) claimedGoals.push(goal);
-        else lostClaimRace++;
-      }
+      let claimedGoal: StudyGoal | undefined;
+      let claimedPlannerGoal: PlannerGoal | undefined;
       const claimedAssignments: Assignment[] = [];
-      for (const assignment of assignments) {
-        if (await this.claimOneShot(this.assignmentsRepository, Assignment, assignment.id, claimedAt)) claimedAssignments.push(assignment);
-        else lostClaimRace++;
-      }
       const claimedExams: Exam[] = [];
-      for (const exam of exams) {
-        if (await this.claimOneShot(this.examsRepository, Exam, exam.id, claimedAt)) claimedExams.push(exam);
-        else lostClaimRace++;
-      }
-      const claimedPlannerGoals: PlannerGoal[] = [];
-      for (const goal of plannerGoals) {
-        if (await this.claimRecurringGoal(this.plannerGoalsRepository, PlannerGoal, goal, claimedAt, 'active')) claimedPlannerGoals.push(goal);
-        else lostClaimRace++;
-      }
       const claimedPlannerTasks: PlannerTask[] = [];
-      for (const task of plannerTasks) {
+
+      if (group.dueGoal && (await this.claimRecurringGoal(this.goalsRepository, StudyGoal, group.dueGoal, claimedAt, 'active'))) {
+        claimedGoal = group.dueGoal;
+      }
+      if (group.duePlannerGoal && (await this.claimRecurringGoal(this.plannerGoalsRepository, PlannerGoal, group.duePlannerGoal, claimedAt, 'active'))) {
+        claimedPlannerGoal = group.duePlannerGoal;
+      }
+      for (const assignment of group.dueAssignments) {
+        if (await this.claimOneShot(this.assignmentsRepository, Assignment, assignment.id, claimedAt)) claimedAssignments.push(assignment);
+      }
+      for (const exam of group.dueExams) {
+        if (await this.claimOneShot(this.examsRepository, Exam, exam.id, claimedAt)) claimedExams.push(exam);
+      }
+      for (const task of group.duePlannerTasks) {
         if (await this.claimOneShot(this.plannerTasksRepository, PlannerTask, task.id, claimedAt)) claimedPlannerTasks.push(task);
-        else lostClaimRace++;
       }
 
-      const claimedTotal =
-        claimedGoals.length + claimedAssignments.length + claimedExams.length + claimedPlannerGoals.length + claimedPlannerTasks.length;
-      if (claimedTotal === 0) continue;
+      const claimedAnything = !!claimedGoal || !!claimedPlannerGoal || claimedAssignments.length > 0 || claimedExams.length > 0 || claimedPlannerTasks.length > 0;
+      if (!claimedAnything) {
+        lostClaimRace++;
+        continue;
+      }
 
       try {
-        const goalSummaries = await Promise.all(claimedGoals.map((goal) => this.buildGoalSummary(goal, user.timezone)));
+        const goalSummary = claimedGoal ? await this.buildGoalSummary(claimedGoal, group.user.timezone) : undefined;
+        const plannerGoalSummary = claimedPlannerGoal ? await this.buildPlannerGoalSummary(claimedPlannerGoal) : undefined;
         const assignmentSummaries = claimedAssignments.map((a) => this.buildAssignmentSummary(a));
         const examSummaries = await Promise.all(claimedExams.map((e) => this.buildExamSummary(e)));
-        const plannerGoalSummaries = await Promise.all(claimedPlannerGoals.map((g) => this.buildPlannerGoalSummary(g)));
         const plannerTaskSummaries = claimedPlannerTasks.map((t) => this.buildPlannerTaskSummary(t));
 
-        const content = buildReminderEmail(user.name, goalSummaries, assignmentSummaries, examSummaries, plannerGoalSummaries, plannerTaskSummaries);
-        await this.emailService.sendHtmlEmail(user.email, content.subject, content.html, content.text);
+        const content = buildGoalReminderEmail({
+          userName: group.user.name,
+          flow: group.flow,
+          goalName: group.goalName,
+          goalSummary,
+          plannerGoalSummary,
+          assignments: assignmentSummaries,
+          exams: examSummaries,
+          plannerTasks: plannerTaskSummaries,
+        });
+        await this.emailService.sendHtmlEmail(group.user.email, content.subject, content.html, content.text);
 
-        sent += claimedTotal;
-        usersEmailed += 1;
-        this.logger.log(`Reminder email sent to 1 user for ${claimedTotal} item(s)`);
+        emailsSent += 1;
+        this.logger.log(`Reminder email sent for goal "${group.goalName}" (${group.flow})`);
       } catch (err) {
-        // Send failed — release every claim so the next run picks these items
-        // back up instead of silently losing a reminder.
+        // Send failed — release every claim made for THIS goal so the next
+        // run picks it back up. Other goals' already-sent emails and
+        // updated timestamps are untouched — one goal's failure never
+        // rolls back another goal's success.
         await Promise.all([
-          ...claimedGoals.map((goal) => this.revertRecurringGoalClaim(this.goalsRepository, StudyGoal, goal, claimedAt)),
+          claimedGoal ? this.revertRecurringGoalClaim(this.goalsRepository, StudyGoal, claimedGoal, claimedAt) : Promise.resolve(),
+          claimedPlannerGoal ? this.revertRecurringGoalClaim(this.plannerGoalsRepository, PlannerGoal, claimedPlannerGoal, claimedAt) : Promise.resolve(),
           ...claimedAssignments.map((a) => this.assignmentsRepository.update({ id: a.id }, { reminderSentAt: null })),
           ...claimedExams.map((e) => this.examsRepository.update({ id: e.id }, { reminderSentAt: null })),
-          ...claimedPlannerGoals.map((goal) => this.revertRecurringGoalClaim(this.plannerGoalsRepository, PlannerGoal, goal, claimedAt)),
           ...claimedPlannerTasks.map((t) => this.plannerTasksRepository.update({ id: t.id }, { reminderSentAt: null })),
         ]);
-        failed += claimedTotal;
-        this.logger.error(`Reminder email failed for 1 user: ${err instanceof Error ? err.message : 'unknown error'}`);
+        failed += 1;
+        this.logger.error(`Reminder email failed for goal "${group.goalName}" (${group.flow}): ${err instanceof Error ? err.message : 'unknown error'}`);
       }
     }
 
-    const skipped = skippedNotDue + skippedQuietHours + lostClaimRace;
-    const processed =
-      goalCandidates.length + assignmentCandidates.length + examCandidates.length + plannerGoalCandidates.length + plannerTaskCandidates.length;
+    const skippedNotDueGoals = goalsProcessed - goalsDue;
+    const skipped = skippedNotDueGoals + skippedQuietHours + lostClaimRace;
     this.logger.log(
-      `Reminder job finished — ${processed} processed, ${totalDue} due, ${sent} sent, ${skipped} skipped (${skippedNotDue} not due, ${skippedQuietHours} quiet hours, ${lostClaimRace} lost claim race), ${failed} failed, ${usersEmailed} users emailed`,
+      `Reminder job finished — ${goalsProcessed} goals processed, ${goalsDue} due, ${emailsSent} emails sent, ${skipped} skipped (${skippedNotDueGoals} not due, ${skippedQuietHours} quiet hours, ${lostClaimRace} lost claim race), ${failed} failed`,
     );
 
     return {
-      processed,
-      due: totalDue,
-      usersEmailed,
-      sent,
+      goalsProcessed,
+      goalsDue,
+      emailsSent,
       skipped,
       failed,
-      details: { skippedNotDue, skippedQuietHours, lostClaimRace },
+      details: { skippedNotDue: skippedNotDueGoals, skippedQuietHours, lostClaimRace },
     };
   }
 

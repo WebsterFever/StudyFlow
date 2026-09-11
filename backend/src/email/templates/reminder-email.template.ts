@@ -183,29 +183,40 @@ function plannerTaskSectionHtml(t: PlannerTaskReminderSummary): string {
     </tr>`;
 }
 
-/** Builds a single-item or consolidated reminder email covering StudentFlow goals/assignments/exams and PlannerFlow goals/tasks — however many of each are due at once. */
-export function buildReminderEmail(
-  userName: string,
-  goals: GoalReminderSummary[],
-  assignments: AssignmentReminderSummary[] = [],
-  exams: ExamReminderSummary[] = [],
-  plannerGoals: PlannerGoalReminderSummary[] = [],
-  plannerTasks: PlannerTaskReminderSummary[] = [],
-): ReminderEmailContent {
+export interface GoalReminderEmailParams {
+  userName: string;
+  /** Which flow owns this goal — determines subject phrasing and the small in-body label. */
+  flow: 'student' | 'planner';
+  goalName: string;
+  /** Present only when this StudentFlow goal's own recurring reminder fired this run. */
+  goalSummary?: GoalReminderSummary;
+  /** Present only when this PlannerFlow goal's own recurring reminder fired this run. */
+  plannerGoalSummary?: PlannerGoalReminderSummary;
+  /** Due assignments belonging to this goal (StudentFlow only). */
+  assignments?: AssignmentReminderSummary[];
+  /** Due exams belonging to this goal (StudentFlow only). */
+  exams?: ExamReminderSummary[];
+  /** Due tasks belonging to this goal (PlannerFlow only). */
+  plannerTasks?: PlannerTaskReminderSummary[];
+}
+
+/**
+ * Builds a reminder email scoped to exactly ONE goal — never combines
+ * unrelated goals into a single email. A goal's own due items (assignments/
+ * exams for a StudentFlow goal, tasks for a PlannerFlow goal) render
+ * together here because they belong to this goal; a second due goal always
+ * gets its own separate call/send from RemindersService.
+ */
+export function buildGoalReminderEmail(params: GoalReminderEmailParams): ReminderEmailContent {
+  const { userName, flow, goalName, goalSummary, plannerGoalSummary, assignments = [], exams = [], plannerTasks = [] } = params;
   const greeting = userName ? `Hi ${userName},` : 'Hi,';
-  const totalCount = goals.length + assignments.length + exams.length + plannerGoals.length + plannerTasks.length;
+  const flowLabel = flow === 'student' ? 'STUDENTFLOW' : 'PLANNERFLOW';
 
-  let subject: string;
-  if (totalCount === 1) {
-    if (goals.length === 1) subject = `GoalFlow — ${goals[0].goalName} is still in progress`;
-    else if (assignments.length === 1) subject = `GoalFlow — ${assignments[0].title} is due today`;
-    else if (exams.length === 1) subject = `GoalFlow — ${exams[0].title} exam is coming up`;
-    else if (plannerGoals.length === 1) subject = `GoalFlow — ${plannerGoals[0].goalName} needs attention`;
-    else subject = `GoalFlow — ${plannerTasks[0].title} is due today`;
-  } else {
-    subject = `GoalFlow — ${totalCount} items need your attention`;
-  }
+  const subject =
+    flow === 'student' ? `GoalFlow — ${goalName} is still in progress` : `GoalFlow — ${goalName} needs your attention`;
 
+  const goalSummaryHtml = goalSummary ? goalSectionHtml(goalSummary, false) : '';
+  const plannerGoalSummaryHtml = plannerGoalSummary ? plannerGoalSectionHtml(plannerGoalSummary, false) : '';
   const assignmentsHtml =
     assignments.length > 0
       ? `<h2 style="margin:20px 0 8px;font-size:14px;color:#0f172a;">Assignments due today</h2><table role="presentation" width="100%">${assignments.map(assignmentSectionHtml).join('')}</table>`
@@ -214,67 +225,41 @@ export function buildReminderEmail(
     exams.length > 0
       ? `<h2 style="margin:20px 0 8px;font-size:14px;color:#0f172a;">Exams coming up</h2><table role="presentation" width="100%">${exams.map(examSectionHtml).join('')}</table>`
       : '';
-  const goalsHtml =
-    goals.length > 0
-      ? goals.length === 1
-        ? goalSectionHtml(goals[0], false)
-        : goals.map((g) => `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid #f1f5f9;">${goalSectionHtml(g, true)}</div>`).join('')
-      : '';
   const plannerTasksHtml =
     plannerTasks.length > 0
-      ? `<h2 style="margin:20px 0 8px;font-size:14px;color:#0f172a;">Planner tasks due today</h2><table role="presentation" width="100%">${plannerTasks.map(plannerTaskSectionHtml).join('')}</table>`
+      ? `<h2 style="margin:20px 0 8px;font-size:14px;color:#0f172a;">Tasks due today</h2><table role="presentation" width="100%">${plannerTasks.map(plannerTaskSectionHtml).join('')}</table>`
       : '';
-  const plannerGoalsHtml =
-    plannerGoals.length > 0
-      ? plannerGoals.length === 1
-        ? plannerGoalSectionHtml(plannerGoals[0], plannerGoals.length + goals.length > 0)
-        : plannerGoals.map((g) => `<div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid #f1f5f9;">${plannerGoalSectionHtml(g, true)}</div>`).join('')
-      : '';
-
-  const introText =
-    totalCount === 1
-      ? goals.length === 1
-        ? `<strong>${escapeHtml(goals[0].goalName)}</strong> needs your attention — you still have study work remaining.`
-        : assignments.length === 1
-          ? `<strong>${escapeHtml(assignments[0].title)}</strong> is due today.`
-          : exams.length === 1
-            ? `<strong>${escapeHtml(exams[0].title)}</strong> is coming up.`
-            : plannerGoals.length === 1
-              ? `<strong>${escapeHtml(plannerGoals[0].goalName)}</strong> needs your attention.`
-              : `<strong>${escapeHtml(plannerTasks[0].title)}</strong> is due today.`
-      : `<strong>${totalCount} items</strong> need your attention.`;
 
   const html = `${WRAPPER_OPEN}
+    <p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:0.06em;color:#818cf8;text-transform:uppercase;">${flowLabel}</p>
     <p style="margin:0 0 4px;color:#0f172a;font-size:15px;">${greeting}</p>
-    <p style="margin:0 0 20px;color:#0f172a;font-size:15px;">${introText}</p>
-    ${goalsHtml}
+    <p style="margin:0 0 20px;color:#0f172a;font-size:15px;"><strong>${escapeHtml(goalName)}</strong> needs your attention.</p>
+    ${goalSummaryHtml}
+    ${plannerGoalSummaryHtml}
     ${assignmentsHtml}
     ${examsHtml}
-    ${plannerGoalsHtml}
     ${plannerTasksHtml}
     <p style="margin:24px 0 0;color:#334155;font-size:14px;">Keep going — completing today's work will keep you on track.</p>
     ${WRAPPER_CLOSE}`;
 
-  const textParts = [`${greeting}`, ''];
-  if (goals.length > 0) textParts.push(goals.map(goalSectionText).join('\n\n---\n\n'));
+  const textParts = [flowLabel, greeting, '', `${goalName} needs your attention.`, ''];
+  if (goalSummary) textParts.push(goalSectionText(goalSummary));
+  if (plannerGoalSummary) {
+    const progress =
+      plannerGoalSummary.tasksTotal > 0 ? `${plannerGoalSummary.tasksCompleted} of ${plannerGoalSummary.tasksTotal} tasks done` : 'no tasks yet';
+    textParts.push(`${progress}${plannerGoalSummary.deadlineLabel ? `, deadline ${plannerGoalSummary.deadlineLabel}` : ''}`);
+  }
   if (assignments.length > 0) {
     textParts.push('Assignments due today:');
-    for (const a of assignments) textParts.push(`  - ${a.title} (${a.goalName}) — due ${a.dueDateLabel}`);
+    for (const a of assignments) textParts.push(`  - ${a.title} — due ${a.dueDateLabel}`);
   }
   if (exams.length > 0) {
     textParts.push('Exams coming up:');
-    for (const e of exams) textParts.push(`  - ${e.title} (${e.goalName}) — ${e.examDateLabel}, ${e.progressPercent}% reviewed`);
-  }
-  if (plannerGoals.length > 0) {
-    textParts.push('Planner goals:');
-    for (const g of plannerGoals) {
-      const progress = g.tasksTotal > 0 ? `${g.tasksCompleted} of ${g.tasksTotal} tasks done` : 'no tasks yet';
-      textParts.push(`  - ${g.goalName} — ${progress}${g.deadlineLabel ? `, deadline ${g.deadlineLabel}` : ''}`);
-    }
+    for (const e of exams) textParts.push(`  - ${e.title} — ${e.examDateLabel}, ${e.progressPercent}% reviewed`);
   }
   if (plannerTasks.length > 0) {
-    textParts.push('Planner tasks due today:');
-    for (const t of plannerTasks) textParts.push(`  - ${t.title} (${t.goalName}) — due ${t.dueDateLabel}, ${t.priority} priority`);
+    textParts.push('Tasks due today:');
+    for (const t of plannerTasks) textParts.push(`  - ${t.title} — due ${t.dueDateLabel}, ${t.priority} priority`);
   }
   textParts.push('', "Keep going — completing today's work will keep you on track.");
   const text = textParts.join('\n');

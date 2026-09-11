@@ -1,7 +1,7 @@
 import { IsBoolean, IsDateString, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { PLANNER_GOAL_PRIORITIES, type PlannerGoalPriority } from '../planner-goal.entity';
 
-export const PLANNER_REMINDER_INTERVAL_MINUTES_OPTIONS = [60, 120, 240, 360, 720, 1440, 2880, 10080];
+export const PLANNER_REMINDER_INTERVAL_MINUTES_OPTIONS = [5, 10, 15, 30, 60, 120, 240, 360, 720, 1440, 2880, 10080];
 
 export class CreatePlannerGoalDto {
   @IsString()

@@ -337,7 +337,7 @@ export interface PlannerGoal {
   updatedAt: string
 }
 
-export const PLANNER_REMINDER_INTERVAL_MINUTES_OPTIONS = [60, 120, 240, 360, 720, 1440, 2880, 10080] as const
+export const PLANNER_REMINDER_INTERVAL_MINUTES_OPTIONS = [5, 10, 15, 30, 60, 120, 240, 360, 720, 1440, 2880, 10080] as const
 
 /** What a planner goal create/edit form collects. */
 export interface PlannerGoalInput {
