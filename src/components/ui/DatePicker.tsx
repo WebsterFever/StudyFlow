@@ -54,7 +54,6 @@ export function DatePicker({ value, onChange, id, label = 'Select date' }: DateP
     }
   }, [open])
 
-  const selected = parseDate(value)
   const firstWeekday = view.getDay()
   const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate()
   const today = toISODate(new Date())
