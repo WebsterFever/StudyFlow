@@ -4,6 +4,7 @@ import type { PlannerGoal, PlannerGoalInput, Priority } from '../../types'
 import { PLANNER_REMINDER_INTERVAL_MINUTES_OPTIONS, PRIORITIES } from '../../types'
 import { Field, Input, Select, Textarea } from '../ui/Form'
 import { Button } from '../ui/Button'
+import { DatePicker } from '../ui/DatePicker'
 
 interface PlannerGoalFormProps {
   goal?: PlannerGoal | null
@@ -55,7 +56,7 @@ export function PlannerGoalForm({ goal, onSave, onCancel }: PlannerGoalFormProps
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Deadline" hint="Optional — leave blank for an open-ended goal">
-          <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+          <DatePicker value={deadline} onChange={setDeadline} label="Choose goal deadline" />
         </Field>
         <Field label="Priority">
           <Select value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
